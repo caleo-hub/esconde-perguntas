@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#10131b">
+  <meta name="description" content="Guarde perguntas, revele respostas e revise no seu ritmo.">
+  <title>Esconde Perguntas</title>
+  <link rel="icon" href="./icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./css/style.css">
+  <script src="./js/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">?</span><span>Esconde<br><strong>Perguntas</strong></span></div>
+      <button id="menuButton" class="icon-button" type="button" aria-label="Abrir menu" aria-haspopup="menu" aria-expanded="false">⋮</button>
+      <div id="menu" class="menu" role="menu" hidden>
+        <button type="button" role="menuitem" id="importButton">Importar perguntas</button>
+        <button type="button" role="menuitem" id="exportButton">Exportar backup</button>
+        <button type="button" role="menuitem" id="installButton" hidden>Instalar aplicativo</button>
+        <button type="button" role="menuitem" id="aboutButton">Sobre o aplicativo</button>
+        <button type="button" role="menuitem" id="deleteAllButton" class="danger-text">Apagar todas as perguntas</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="pageTitle">
+        <div class="eyebrow"><span class="eyebrow-dot"></span> SEU ESPAÇO DE REVISÃO</div>
+        <h1 id="pageTitle">Uma pergunta<br><em>de cada vez.</em></h1>
+        <p>Organize suas perguntas, revele as respostas quando quiser e estude no seu ritmo.</p>
+        <button id="studyButton" class="primary-button study-cta" type="button"><span id="heroActionIcon" aria-hidden="true">＋</span> <span id="heroActionText">Criar pergunta</span> <span aria-hidden="true">↗</span></button>
+      </section>
+
+      <section class="collection" aria-labelledby="collectionTitle">
+        <div class="section-heading"><div><div class="eyebrow">SUA COLEÇÃO</div><h2 id="collectionTitle">Perguntas <span id="countBadge" class="count-badge">0</span></h2></div><button id="shuffleButton" class="text-button" type="button" aria-pressed="false"><span aria-hidden="true">⇄</span> Embaralhar</button></div>
+        <button id="batchButton" class="batch-link" type="button"><span aria-hidden="true">▦</span> Adicionar em lote</button>
+        <label class="search-box"><span aria-hidden="true">⌕</span><span class="sr-only">Buscar perguntas</span><input id="searchInput" type="search" placeholder="Buscar perguntas..." autocomplete="off"></label>
+        <div id="questionList" class="question-list"></div>
+        <div id="emptyState" class="empty-state" hidden><div class="empty-icon" aria-hidden="true">✦</div><h3 id="emptyTitle">Sua coleção começa aqui</h3><p id="emptyText">Adicione a primeira pergunta para começar a revisar.</p><button id="emptyAddButton" class="secondary-button" type="button">Criar pergunta</button></div>
+      </section>
+    </main>
+    <button id="addButton" class="fab" type="button" aria-label="Adicionar pergunta">+</button>
+  </div>
+
+  <dialog id="formDialog" class="sheet-dialog">
+    <form id="questionForm" class="sheet" novalidate>
+      <div class="dialog-head"><div><div class="eyebrow">SUA COLEÇÃO</div><h2 id="formTitle">Nova pergunta</h2></div><button class="icon-button close-button" type="button" data-close="formDialog" aria-label="Fechar">×</button></div>
+      <input id="questionId" type="hidden">
+      <label for="questionField">Pergunta</label><textarea id="questionField" rows="4" maxlength="2000" placeholder="O que você quer lembrar?" required></textarea>
+      <label for="answerField">Resposta</label><textarea id="answerField" rows="7" maxlength="10000" placeholder="Escreva a resposta aqui..." required></textarea>
+      <p id="formError" class="form-error" role="alert" hidden></p>
+      <button class="primary-button save-button" type="submit">Salvar pergunta</button>
+    </form>
+  </dialog>
+
+  <dialog id="batchDialog" class="sheet-dialog">
+    <form id="batchForm" class="sheet" novalidate>
+      <div class="dialog-head"><div><div class="eyebrow">CADASTRO RÁPIDO</div><h2>Adicionar em lote</h2></div><button class="icon-button close-button" type="button" data-close="batchDialog" aria-label="Fechar">×</button></div>
+      <p class="batch-help">Cole uma lista numerada como a que o ChatGPT produz. O app identifica cada pergunta e a resposta da linha seguinte automaticamente.</p>
+      <div class="batch-example"><span>EXEMPLO</span><code>1. Qual é o principal receptor da cetamina?<br>   NMDA.<br><br>2. O receptor NMDA é excitatório?<br>   Sim.</code></div>
+      <button id="copyPromptButton" class="prompt-button" type="button">Copiar prompt para o ChatGPT <span aria-hidden="true">↗</span></button>
+      <label for="batchField">Suas perguntas e respostas</label><textarea id="batchField" rows="11" placeholder="Cole aqui seus pares de pergunta e resposta..."></textarea>
+      <p class="batch-hint">Também aceita pares separados por uma linha vazia, linhas no formato <code>Pergunta | Resposta</code> ou colunas copiadas de uma planilha.</p>
+      <p id="batchPreview" class="batch-preview" role="status" aria-live="polite">Nenhum par encontrado.</p>
+      <p id="batchError" class="form-error" role="alert" hidden></p>
+      <button id="batchSave" class="primary-button save-button" type="submit" disabled>Adicionar perguntas</button>
+    </form>
+  </dialog>
+
+  <dialog id="studyDialog" class="study-dialog">
+    <div class="study-panel"><div class="study-top"><button id="studyClose" class="icon-button" type="button" aria-label="Fechar revisão">×</button><span>MODO ESTUDO</span><button id="studyShuffle" class="icon-button" type="button" aria-label="Embaralhar revisão" title="Embaralhar">⇄</button></div><div class="study-progress"><span id="studyCounter"></span><div class="progress-track"><div id="progressFill"></div></div></div><div class="study-body"><div class="eyebrow">PERGUNTA</div><h2 id="studyQuestion"></h2><div id="studyAnswerBlock" class="study-answer" hidden><div class="eyebrow">RESPOSTA</div><p id="studyAnswer"></p></div></div><div class="study-actions"><button id="studyReveal" class="primary-button" type="button">Mostrar resposta</button><div class="study-nav"><button id="studyPrevious" class="secondary-button" type="button">← Anterior</button><button id="studyNext" class="secondary-button" type="button">Próxima →</button></div></div></div>
+  </dialog>
+
+  <dialog id="confirmDialog" class="confirm-dialog"><div class="confirm-panel"><div class="eyebrow">CONFIRMAR AÇÃO</div><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="confirm-actions"><button id="confirmCancel" class="secondary-button" type="button">Cancelar</button><button id="confirmAccept" class="danger-button" type="button">Apagar</button></div></div></dialog>
+  <dialog id="aboutDialog" class="confirm-dialog"><div class="confirm-panel"><div class="eyebrow">SOBRE</div><h2>Esconde Perguntas</h2><p>Suas perguntas ficam salvas neste navegador. Exporte um backup para levá-las a outro aparelho. Depois da primeira visita, o aplicativo pode funcionar sem internet.</p><button class="secondary-button" type="button" data-close="aboutDialog">Fechar</button></div></dialog>
+  <input id="importInput" type="file" accept=".json,application/json" hidden>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
