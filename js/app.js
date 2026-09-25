@@ -67,6 +67,7 @@
     $('countBadge').textContent = state.questions.length;
     $('heroActionIcon').textContent = state.questions.length ? '▶' : '＋';
     $('heroActionText').textContent = state.questions.length ? 'Começar revisão' : 'Criar pergunta';
+    $('addButton').hidden = state.questions.length === 0;
     $('shuffleButton').disabled = state.questions.length < 2;
     const query = $('searchInput').value.trim().toLocaleLowerCase('pt-BR');
     const visible = orderedQuestions().filter(item => item.pergunta.toLocaleLowerCase('pt-BR').includes(query));
@@ -74,8 +75,7 @@
     list.replaceChildren(...visible.map((item, index) => createCard(item, index)));
     $('emptyState').hidden = visible.length > 0;
     $('emptyTitle').textContent = state.questions.length ? 'Nenhuma pergunta encontrada' : 'Sua coleção começa aqui';
-    $('emptyText').textContent = state.questions.length ? 'Tente buscar por outra palavra.' : 'Adicione a primeira pergunta para começar a revisar.';
-    $('emptyAddButton').hidden = state.questions.length > 0;
+    $('emptyText').textContent = state.questions.length ? 'Tente buscar por outra palavra.' : 'Use os botões acima para criar uma pergunta ou colar uma lista inteira.';
   }
 
   function createCard(item, index) {
@@ -288,7 +288,6 @@
   function setup() {
     load(); render();
     $('addButton').addEventListener('click', () => openForm());
-    $('emptyAddButton').addEventListener('click', () => openForm());
     $('questionForm').addEventListener('submit', saveForm);
     $('searchInput').addEventListener('input', render);
     $('shuffleButton').addEventListener('click', () => {
@@ -298,7 +297,7 @@
       render();
     });
     $('studyButton').addEventListener('click', () => state.questions.length ? startStudy() : openForm());
-    $('batchButton').addEventListener('click', () => { $('batchField').value = ''; updateBatchPreview(); $('batchDialog').showModal(); $('batchField').focus(); });
+    $('batchButton').addEventListener('click', () => { $('batchField').value = ''; updateBatchPreview(); $('batchDialog').showModal(); });
     $('batchField').addEventListener('input', updateBatchPreview);
     $('batchForm').addEventListener('submit', saveBatch);
     $('copyPromptButton').addEventListener('click', async () => {
