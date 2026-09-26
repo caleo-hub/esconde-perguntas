@@ -2,8 +2,9 @@
   'use strict';
 
   const STORAGE_KEY = 'escondePerguntas';
+  const GENERAL_ID = 'geral';
   const $ = id => document.getElementById(id);
-  const state = { questions: [], filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyIndex: 0, studyRevealed: false, installPrompt: null };
+  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyIndex: 0, studyRevealed: false, installPrompt: null };
   let toastTimer;
 
   function validQuestion(item) {
@@ -12,7 +13,7 @@
 
   function normalizeQuestion(item) {
     const now = new Date().toISOString();
-    return { id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(), pergunta: item.pergunta.trim(), resposta: item.resposta.trim(), dificil: item.dificil === true, criadaEm: typeof item.criadaEm === 'string' ? item.criadaEm : now, atualizadaEm: typeof item.atualizadaEm === 'string' ? item.atualizadaEm : now };
+    return { id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(), listaId: typeof item.listaId === 'string' ? item.listaId : GENERAL_ID, pergunta: item.pergunta.trim(), resposta: item.resposta.trim(), dificil: item.dificil === true, criadaEm: typeof item.criadaEm === 'string' ? item.criadaEm : now, atualizadaEm: typeof item.atualizadaEm === 'string' ? item.atualizadaEm : now };
   }
 
   function notify(message) {
@@ -26,18 +27,28 @@
   function load() {
     try {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      if (!Array.isArray(stored)) throw new Error('Formato inválido');
-      state.questions = stored.filter(validQuestion).map(normalizeQuestion);
+      const legacy = Array.isArray(stored);
+      if (!legacy && (!stored || stored.version !== 2 || !Array.isArray(stored.listas) || !Array.isArray(stored.perguntas))) throw new Error('Formato inválido');
+      const lists = legacy ? [] : stored.listas.filter(item => item && typeof item.id === 'string' && typeof item.nome === 'string' && item.nome.trim()).map(item => ({ id: item.id, nome: item.nome.trim() }));
+      state.lists = [{ id: GENERAL_ID, nome: 'Geral' }, ...lists.filter(item => item.id !== GENERAL_ID)];
+      const validIds = new Set(state.lists.map(item => item.id));
+      state.questions = (legacy ? stored : stored.perguntas).filter(validQuestion).map(normalizeQuestion).map(item => validIds.has(item.listaId) ? item : { ...item, listaId: GENERAL_ID });
+      if (legacy && localStorage.getItem(STORAGE_KEY) !== null) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, listas: state.lists, perguntas: state.questions })); }
+        catch (error) { notify('Não foi possível atualizar os dados salvos. Exporte um backup antes de fechar o navegador.'); }
+      }
     } catch (error) {
       state.questions = [];
+      state.lists = [{ id: GENERAL_ID, nome: 'Geral' }];
       notify('Não foi possível ler as perguntas salvas neste navegador.');
     }
   }
 
-  function persist(next) {
+  function persist(next, nextLists = state.lists) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, listas: nextLists, perguntas: next }));
       state.questions = next;
+      state.lists = nextLists;
       render();
       return true;
     } catch (error) {
@@ -65,7 +76,7 @@
 
   function visibleQuestions() {
     const query = $('searchInput').value.trim().toLocaleLowerCase('pt-BR');
-    return orderedQuestions().filter(item => (state.filter === 'all' || item.dificil) && item.pergunta.toLocaleLowerCase('pt-BR').includes(query));
+    return orderedQuestions().filter(item => item.listaId === state.currentListId && (state.filter === 'all' || item.dificil) && item.pergunta.toLocaleLowerCase('pt-BR').includes(query));
   }
 
   function updateDifficultButton(button, difficult, withText = false) {
@@ -85,25 +96,76 @@
     }
   }
 
+  function openList(id) {
+    if (!state.lists.some(list => list.id === id)) return;
+    state.currentListId = id;
+    state.filter = 'all';
+    state.shuffled = false;
+    state.displayIds = [];
+    $('shuffleButton').setAttribute('aria-pressed', 'false');
+    $('searchInput').value = '';
+    $('listOptions').hidden = true;
+    $('listOptionsButton').setAttribute('aria-expanded', 'false');
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function renderHome() {
+    const cards = state.lists.map(list => {
+      const questions = state.questions.filter(item => item.listaId === list.id);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'list-card';
+      button.dataset.id = list.id;
+      const icon = document.createElement('span');
+      icon.className = 'list-card-icon';
+      icon.textContent = list.id === GENERAL_ID ? '✦' : '▦';
+      const name = document.createElement('strong');
+      name.textContent = list.nome;
+      const meta = document.createElement('span');
+      meta.className = 'list-card-meta';
+      const difficultCount = questions.filter(item => item.dificil).length;
+      meta.textContent = `${questions.length} pergunta${questions.length === 1 ? '' : 's'} · ★ ${difficultCount} ${difficultCount === 1 ? 'difícil' : 'difíceis'}`;
+      const arrow = document.createElement('span');
+      arrow.className = 'list-card-arrow';
+      arrow.setAttribute('aria-hidden', 'true');
+      arrow.textContent = '→';
+      button.append(icon, name, meta, arrow);
+      button.addEventListener('click', () => openList(list.id));
+      return button;
+    });
+    $('listGrid').replaceChildren(...cards);
+  }
+
   function render() {
+    if (state.currentListId && !state.lists.some(list => list.id === state.currentListId)) state.currentListId = null;
+    $('homeView').hidden = state.currentListId !== null;
+    $('listView').hidden = state.currentListId === null;
+    renderHome();
+    if (!state.currentListId) { $('addButton').hidden = true; return; }
+    const currentList = state.lists.find(list => list.id === state.currentListId);
+    const listQuestions = state.questions.filter(item => item.listaId === state.currentListId);
     const visible = visibleQuestions();
-    const difficultCount = state.questions.filter(item => item.dificil).length;
+    const difficultCount = listQuestions.filter(item => item.dificil).length;
     const difficultFilter = state.filter === 'difficult';
-    $('allCount').textContent = state.questions.length;
+    $('listName').textContent = currentList.nome;
+    $('listSummary').textContent = `${listQuestions.length} pergunta${listQuestions.length === 1 ? '' : 's'} nesta lista · ★ ${difficultCount} ${difficultCount === 1 ? 'difícil' : 'difíceis'}`;
+    $('listOptionsButton').hidden = currentList.id === GENERAL_ID;
+    $('allCount').textContent = listQuestions.length;
     $('difficultCount').textContent = difficultCount;
     $('filterAll').setAttribute('aria-pressed', String(!difficultFilter));
     $('filterDifficult').setAttribute('aria-pressed', String(difficultFilter));
-    $('countBadge').textContent = state.questions.length;
-    $('heroActionIcon').textContent = state.questions.length || difficultFilter ? '▶' : '＋';
-    $('heroActionText').textContent = difficultFilter ? 'Revisar difíceis' : (state.questions.length ? 'Começar revisão' : 'Criar pergunta');
-    $('studyButton').disabled = !visible.length && (difficultFilter || state.questions.length > 0);
-    $('addButton').hidden = state.questions.length === 0;
+    $('countBadge').textContent = listQuestions.length;
+    $('heroActionIcon').textContent = listQuestions.length || difficultFilter ? '▶' : '＋';
+    $('heroActionText').textContent = difficultFilter ? 'Revisar difíceis' : (listQuestions.length ? 'Começar revisão' : 'Criar pergunta');
+    $('studyButton').disabled = !visible.length && (difficultFilter || listQuestions.length > 0);
+    $('addButton').hidden = listQuestions.length === 0;
     $('shuffleButton').disabled = visible.length < 2;
     const list = $('questionList');
     list.replaceChildren(...visible.map((item, index) => createCard(item, index)));
     $('emptyState').hidden = visible.length > 0;
-    $('emptyTitle').textContent = state.questions.length ? 'Nenhuma pergunta encontrada' : 'Sua coleção começa aqui';
-    $('emptyText').textContent = state.questions.length ? 'Tente buscar por outra palavra.' : 'Use os botões acima para criar uma pergunta ou colar uma lista inteira.';
+    $('emptyTitle').textContent = listQuestions.length ? 'Nenhuma pergunta encontrada' : 'Esta lista começa aqui';
+    $('emptyText').textContent = listQuestions.length ? 'Tente buscar por outra palavra.' : 'Crie uma pergunta ou cole um lote neste assunto.';
     if (difficultFilter && !difficultCount) {
       $('emptyTitle').textContent = 'Nenhuma pergunta difícil ainda';
       $('emptyText').textContent = 'Marque uma pergunta com a estrela para revisar aqui.';
@@ -140,6 +202,9 @@
     const edit = document.createElement('button');
     edit.type = 'button'; edit.textContent = 'Editar';
     edit.addEventListener('click', () => openForm(item));
+    const move = document.createElement('button');
+    move.type = 'button'; move.textContent = 'Mover';
+    move.addEventListener('click', () => openMove(item));
     const remove = document.createElement('button');
     remove.type = 'button'; remove.textContent = 'Excluir';
     remove.addEventListener('click', async () => {
@@ -147,7 +212,7 @@
         if (persist(state.questions.filter(question => question.id !== item.id))) notify('Pergunta excluída.');
       }
     });
-    menu.append(edit, remove);
+    menu.append(edit, move, remove);
     menuButton.addEventListener('click', () => { menu.hidden = !menu.hidden; menuButton.setAttribute('aria-expanded', String(!menu.hidden)); });
     const title = document.createElement('h3');
     title.textContent = item.pergunta;
@@ -190,8 +255,80 @@
     const id = $('questionId').value;
     const now = new Date().toISOString();
     const existing = state.questions.find(item => item.id === id);
-    const updated = existing ? state.questions.map(item => item.id === id ? { ...item, pergunta, resposta, atualizadaEm: now } : item) : [{ id: crypto.randomUUID(), pergunta, resposta, dificil: false, criadaEm: now, atualizadaEm: now }, ...state.questions];
+    const updated = existing ? state.questions.map(item => item.id === id ? { ...item, pergunta, resposta, atualizadaEm: now } : item) : [{ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, criadaEm: now, atualizadaEm: now }, ...state.questions];
     if (persist(updated)) { $('formDialog').close(); notify(existing ? 'Pergunta atualizada.' : 'Pergunta adicionada.'); }
+  }
+
+  function openListForm(list = null) {
+    $('listForm').reset();
+    $('listError').hidden = true;
+    $('listIdField').value = list?.id || '';
+    $('listNameField').value = list?.nome || '';
+    $('listFormTitle').textContent = list ? 'Renomear lista' : 'Nova lista';
+    $('listDialog').showModal();
+    $('listNameField').focus();
+  }
+
+  function saveListForm(event) {
+    event.preventDefault();
+    const name = $('listNameField').value.trim();
+    const id = $('listIdField').value;
+    const normalized = name.toLocaleLowerCase('pt-BR');
+    const error = !name ? 'Digite um nome para a lista.' : state.lists.some(list => list.id !== id && list.nome.toLocaleLowerCase('pt-BR') === normalized) ? 'Já existe uma lista com esse nome.' : '';
+    if (error) {
+      $('listError').textContent = error;
+      $('listError').hidden = false;
+      $('listNameField').focus();
+      return;
+    }
+    if (id) {
+      if (persist(state.questions, state.lists.map(list => list.id === id ? { ...list, nome: name } : list))) {
+        $('listDialog').close();
+        notify('Lista renomeada.');
+      }
+    } else {
+      const newId = crypto.randomUUID();
+      if (persist(state.questions, [...state.lists, { id: newId, nome: name }])) {
+        $('listDialog').close();
+        openList(newId);
+        notify('Lista criada.');
+      }
+    }
+  }
+
+  function openMove(item) {
+    const targets = state.lists.filter(list => list.id !== item.listaId);
+    if (!targets.length) { notify('Crie outra lista antes de mover esta pergunta.'); return; }
+    $('moveQuestionId').value = item.id;
+    $('moveTarget').replaceChildren(...targets.map(list => {
+      const option = document.createElement('option');
+      option.value = list.id;
+      option.textContent = list.nome;
+      return option;
+    }));
+    $('moveDialog').showModal();
+  }
+
+  function saveMove(event) {
+    event.preventDefault();
+    const id = $('moveQuestionId').value;
+    const target = $('moveTarget').value;
+    if (!state.lists.some(list => list.id === target) || !state.questions.some(item => item.id === id)) return;
+    if (persist(state.questions.map(item => item.id === id ? { ...item, listaId: target, atualizadaEm: new Date().toISOString() } : item))) {
+      $('moveDialog').close();
+      notify('Pergunta movida.');
+    }
+  }
+
+  async function deleteCurrentList() {
+    const id = state.currentListId;
+    if (!id || id === GENERAL_ID) return;
+    const list = state.lists.find(item => item.id === id);
+    const count = state.questions.filter(item => item.listaId === id).length;
+    if (await confirmAction(`Excluir ${list.nome}?`, count ? `${count} pergunta${count === 1 ? '' : 's'} desta lista serão movidas para Geral, com respostas e estrelas preservadas.` : 'Esta lista vazia será excluída.', 'Excluir lista')) {
+      const moved = state.questions.map(item => item.listaId === id ? { ...item, listaId: GENERAL_ID } : item);
+      if (persist(moved, state.lists.filter(item => item.id !== id))) notify('Lista excluída. Perguntas movidas para Geral.');
+    }
   }
 
   function parseBatch(raw) {
@@ -244,18 +381,19 @@
       return;
     }
     const now = new Date().toISOString();
-    const incoming = pairs.map(({ pergunta, resposta }) => ({ id: crypto.randomUUID(), pergunta, resposta, dificil: false, criadaEm: now, atualizadaEm: now }));
+    const incoming = pairs.map(({ pergunta, resposta }) => ({ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, criadaEm: now, atualizadaEm: now }));
     if (persist([...incoming, ...state.questions])) {
       $('batchDialog').close();
       notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} adicionada${incoming.length === 1 ? '' : 's'}.`);
     }
   }
 
-  function confirmAction(title, message) {
+  function confirmAction(title, message, acceptLabel = 'Apagar') {
     return new Promise(resolve => {
       const dialog = $('confirmDialog');
       $('confirmTitle').textContent = title;
       $('confirmText').textContent = message;
+      $('confirmAccept').textContent = acceptLabel;
       const accept = () => { cleanup(); dialog.close(); resolve(true); };
       const cancel = () => { cleanup(); dialog.close(); resolve(false); };
       const closed = () => { cleanup(); resolve(false); };
@@ -292,7 +430,7 @@
   }
 
   function exportBackup() {
-    const data = { version: 1, exportadoEm: new Date().toISOString(), perguntas: state.questions };
+    const data = { version: 2, exportadoEm: new Date().toISOString(), listas: state.lists, perguntas: state.questions };
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
@@ -309,15 +447,27 @@
     if (file.size > 5_000_000) { notify('O arquivo é grande demais para importar.'); return; }
     try {
       const data = JSON.parse(await file.text());
-      if (!data || data.version !== 1 || !Array.isArray(data.perguntas) || !data.perguntas.every(validQuestion)) throw new Error('Formato inválido');
-      if (!data.perguntas.length) { notify('O backup não contém perguntas.'); return; }
+      if (!data || ![1, 2].includes(data.version) || !Array.isArray(data.perguntas) || !data.perguntas.every(validQuestion) || (data.version === 2 && (!Array.isArray(data.listas) || !data.listas.every(list => list && typeof list.id === 'string' && typeof list.nome === 'string' && list.nome.trim() && list.nome.length <= 60)))) throw new Error('Formato inválido');
+      if (!data.perguntas.length && (data.version === 1 || !data.listas.length)) { notify('O backup não contém perguntas ou listas.'); return; }
+      const nextLists = [...state.lists];
+      const listIds = new Map([[GENERAL_ID, GENERAL_ID]]);
+      if (data.version === 2) {
+        for (const list of data.listas) {
+          const name = list.nome.trim();
+          const existing = nextLists.find(item => item.nome.toLocaleLowerCase('pt-BR') === name.toLocaleLowerCase('pt-BR'));
+          const id = list.id === GENERAL_ID || name.toLocaleLowerCase('pt-BR') === 'geral' ? GENERAL_ID : existing?.id || crypto.randomUUID();
+          listIds.set(list.id, id);
+          if (!nextLists.some(item => item.id === id)) nextLists.push({ id, nome: name });
+        }
+      }
       const existingIds = new Set(state.questions.map(item => item.id));
       const incoming = data.perguntas.map(normalizeQuestion).map(item => {
+        item.listaId = data.version === 2 ? (listIds.get(item.listaId) || GENERAL_ID) : GENERAL_ID;
         if (existingIds.has(item.id)) item.id = crypto.randomUUID();
         existingIds.add(item.id);
         return item;
       });
-      if (persist([...incoming, ...state.questions])) notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} importada${incoming.length === 1 ? '' : 's'}.`);
+      if (persist([...incoming, ...state.questions], nextLists)) notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} importada${incoming.length === 1 ? '' : 's'}.`);
     } catch (error) {
       notify('Arquivo inválido. Selecione um backup JSON do aplicativo.');
     } finally {
@@ -329,6 +479,13 @@
 
   function setup() {
     load(); render();
+    $('newListButton').addEventListener('click', () => openListForm());
+    $('listForm').addEventListener('submit', saveListForm);
+    $('backButton').addEventListener('click', () => { state.currentListId = null; render(); window.scrollTo(0, 0); });
+    $('listOptionsButton').addEventListener('click', () => { $('listOptions').hidden = !$('listOptions').hidden; $('listOptionsButton').setAttribute('aria-expanded', String(!$('listOptions').hidden)); });
+    $('renameListButton').addEventListener('click', () => { $('listOptions').hidden = true; openListForm(state.lists.find(list => list.id === state.currentListId)); });
+    $('deleteListButton').addEventListener('click', () => { $('listOptions').hidden = true; deleteCurrentList(); });
+    $('moveForm').addEventListener('submit', saveMove);
     $('addButton').addEventListener('click', () => openForm());
     $('questionForm').addEventListener('submit', saveForm);
     $('searchInput').addEventListener('input', render);
@@ -338,7 +495,7 @@
       $('shuffleButton').setAttribute('aria-pressed', String(state.shuffled));
       render();
     });
-    $('studyButton').addEventListener('click', () => state.questions.length ? startStudy() : openForm());
+    $('studyButton').addEventListener('click', () => state.questions.some(item => item.listaId === state.currentListId) ? startStudy() : openForm());
     for (const [id, filter] of [['filterAll', 'all'], ['filterDifficult', 'difficult']]) {
       $(id).addEventListener('click', () => { state.filter = filter; render(); });
     }
@@ -359,12 +516,13 @@
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => $(button.dataset.close).close()));
     $('menuButton').addEventListener('click', () => { $('menu').hidden = !$('menu').hidden; $('menuButton').setAttribute('aria-expanded', String(!$('menu').hidden)); });
     document.addEventListener('click', event => { if (!$('menu').contains(event.target) && !$('menuButton').contains(event.target)) closeMenu(); });
+    document.addEventListener('click', event => { if (!$('listOptions').contains(event.target) && !$('listOptionsButton').contains(event.target)) { $('listOptions').hidden = true; $('listOptionsButton').setAttribute('aria-expanded', 'false'); } });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMenu(); });
     $('exportButton').addEventListener('click', () => { closeMenu(); exportBackup(); });
     $('importButton').addEventListener('click', () => { closeMenu(); $('importInput').click(); });
     $('importInput').addEventListener('change', event => importBackup(event.target.files[0]));
     $('aboutButton').addEventListener('click', () => { closeMenu(); $('aboutDialog').showModal(); });
-    $('deleteAllButton').addEventListener('click', async () => { closeMenu(); if (!state.questions.length) { notify('Não há perguntas para apagar.'); return; } if (await confirmAction('Apagar todas as perguntas?', 'Todas as perguntas e respostas deste navegador serão apagadas. Exporte um backup antes, se quiser guardá-las.')) { if (persist([])) notify('Todas as perguntas foram apagadas.'); } });
+    $('deleteAllButton').addEventListener('click', async () => { closeMenu(); if (!state.questions.length && state.lists.length === 1) { notify('Não há dados para apagar.'); return; } if (await confirmAction('Apagar todos os dados?', 'Todas as listas e perguntas deste navegador serão apagadas. Geral ficará vazia. Exporte um backup antes, se quiser guardá-las.', 'Apagar tudo')) { if (persist([], [{ id: GENERAL_ID, nome: 'Geral' }])) { state.currentListId = null; render(); notify('Listas e perguntas apagadas.'); } } });
     window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); state.installPrompt = event; $('installButton').hidden = false; });
     $('installButton').addEventListener('click', async () => { closeMenu(); if (state.installPrompt) { await state.installPrompt.prompt(); state.installPrompt = null; $('installButton').hidden = true; } });
     window.addEventListener('appinstalled', () => { state.installPrompt = null; $('installButton').hidden = true; });

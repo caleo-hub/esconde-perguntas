@@ -1,4 +1,4 @@
-const CACHE_NAME = 'esconde-perguntas-v3';
+const CACHE_NAME = 'esconde-perguntas-v4';
 const APP_FILES = ['./', './index.html', './css/style.css', './js/app.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', event => {
