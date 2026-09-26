@@ -73,6 +73,15 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .search-box input { width: 100%; height: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 16px; }
 .search-box input::placeholder { color: var(--muted); opacity: .85; }
 .question-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.collection-filters { display: flex; gap: 8px; margin-bottom: 14px; }
+.collection-filters button { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; min-height: 46px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); font-size: 14px; font-weight: 750; }
+.collection-filters button[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
+.collection-filters span { min-width: 22px; padding: 2px 5px; border-radius: 6px; background: var(--surface-2); font-size: 12px; }
+.card-actions { display: flex; gap: 4px; }
+.difficult-button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--muted); font-size: 25px; cursor: pointer; }
+.difficult-button[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
+.difficult-button:hover { background: var(--accent-soft); }
+.study-difficult { display: block; margin: 0 auto 10px; font-size: 14px; font-weight: 750; }
 .question-card { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); }
 .card-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .card-number { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .13em; }

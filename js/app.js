@@ -3,7 +3,7 @@
 
   const STORAGE_KEY = 'escondePerguntas';
   const $ = id => document.getElementById(id);
-  const state = { questions: [], shuffled: false, displayIds: [], studyIds: [], studyIndex: 0, studyRevealed: false, installPrompt: null };
+  const state = { questions: [], filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyIndex: 0, studyRevealed: false, installPrompt: null };
   let toastTimer;
 
   function validQuestion(item) {
@@ -12,7 +12,7 @@
 
   function normalizeQuestion(item) {
     const now = new Date().toISOString();
-    return { id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(), pergunta: item.pergunta.trim(), resposta: item.resposta.trim(), criadaEm: typeof item.criadaEm === 'string' ? item.criadaEm : now, atualizadaEm: typeof item.atualizadaEm === 'string' ? item.atualizadaEm : now };
+    return { id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(), pergunta: item.pergunta.trim(), resposta: item.resposta.trim(), dificil: item.dificil === true, criadaEm: typeof item.criadaEm === 'string' ? item.criadaEm : now, atualizadaEm: typeof item.atualizadaEm === 'string' ? item.atualizadaEm : now };
   }
 
   function notify(message) {
@@ -63,24 +63,57 @@
     return [...known, ...remaining];
   }
 
-  function render() {
-    $('countBadge').textContent = state.questions.length;
-    $('heroActionIcon').textContent = state.questions.length ? '▶' : '＋';
-    $('heroActionText').textContent = state.questions.length ? 'Começar revisão' : 'Criar pergunta';
-    $('addButton').hidden = state.questions.length === 0;
-    $('shuffleButton').disabled = state.questions.length < 2;
+  function visibleQuestions() {
     const query = $('searchInput').value.trim().toLocaleLowerCase('pt-BR');
-    const visible = orderedQuestions().filter(item => item.pergunta.toLocaleLowerCase('pt-BR').includes(query));
+    return orderedQuestions().filter(item => (state.filter === 'all' || item.dificil) && item.pergunta.toLocaleLowerCase('pt-BR').includes(query));
+  }
+
+  function updateDifficultButton(button, difficult, withText = false) {
+    button.textContent = withText ? (difficult ? '★ Difícil' : '☆ Marcar difícil') : (difficult ? '★' : '☆');
+    button.setAttribute('aria-pressed', String(difficult));
+    button.setAttribute('aria-label', difficult ? 'Desmarcar como difícil' : 'Marcar como difícil');
+  }
+
+  function toggleDifficult(id, fromStudy = false) {
+    const item = state.questions.find(question => question.id === id);
+    if (!item) return;
+    if (!persist(state.questions.map(question => question.id === id ? { ...question, dificil: !question.dificil, atualizadaEm: new Date().toISOString() } : question))) return;
+    if (fromStudy) renderStudy();
+    else {
+      const card = [...$('questionList').children].find(element => element.dataset.id === id);
+      (card?.querySelector('.difficult-button') || $('filterDifficult')).focus({ preventScroll: true });
+    }
+  }
+
+  function render() {
+    const visible = visibleQuestions();
+    const difficultCount = state.questions.filter(item => item.dificil).length;
+    const difficultFilter = state.filter === 'difficult';
+    $('allCount').textContent = state.questions.length;
+    $('difficultCount').textContent = difficultCount;
+    $('filterAll').setAttribute('aria-pressed', String(!difficultFilter));
+    $('filterDifficult').setAttribute('aria-pressed', String(difficultFilter));
+    $('countBadge').textContent = state.questions.length;
+    $('heroActionIcon').textContent = state.questions.length || difficultFilter ? '▶' : '＋';
+    $('heroActionText').textContent = difficultFilter ? 'Revisar difíceis' : (state.questions.length ? 'Começar revisão' : 'Criar pergunta');
+    $('studyButton').disabled = !visible.length && (difficultFilter || state.questions.length > 0);
+    $('addButton').hidden = state.questions.length === 0;
+    $('shuffleButton').disabled = visible.length < 2;
     const list = $('questionList');
     list.replaceChildren(...visible.map((item, index) => createCard(item, index)));
     $('emptyState').hidden = visible.length > 0;
     $('emptyTitle').textContent = state.questions.length ? 'Nenhuma pergunta encontrada' : 'Sua coleção começa aqui';
     $('emptyText').textContent = state.questions.length ? 'Tente buscar por outra palavra.' : 'Use os botões acima para criar uma pergunta ou colar uma lista inteira.';
+    if (difficultFilter && !difficultCount) {
+      $('emptyTitle').textContent = 'Nenhuma pergunta difícil ainda';
+      $('emptyText').textContent = 'Marque uma pergunta com a estrela para revisar aqui.';
+    }
   }
 
   function createCard(item, index) {
     const card = document.createElement('article');
     card.className = 'question-card';
+    card.dataset.id = item.id;
     const top = document.createElement('div');
     top.className = 'card-top';
     const number = document.createElement('span');
@@ -92,7 +125,15 @@
     menuButton.setAttribute('aria-label', 'Opções da pergunta');
     menuButton.setAttribute('aria-expanded', 'false');
     menuButton.textContent = '⋮';
-    top.append(number, menuButton);
+    const actions = document.createElement('div');
+    actions.className = 'card-actions';
+    const difficult = document.createElement('button');
+    difficult.type = 'button';
+    difficult.className = 'difficult-button';
+    updateDifficultButton(difficult, item.dificil);
+    difficult.addEventListener('click', () => toggleDifficult(item.id));
+    actions.append(difficult, menuButton);
+    top.append(number, actions);
     const menu = document.createElement('div');
     menu.className = 'card-menu';
     menu.hidden = true;
@@ -111,16 +152,16 @@
     const title = document.createElement('h3');
     title.textContent = item.pergunta;
     const answer = document.createElement('div');
-    answer.className = 'card-answer'; answer.hidden = true;
+    answer.className = 'card-answer'; answer.hidden = !state.revealedIds.has(item.id);
     const label = document.createElement('div');
     label.className = 'eyebrow'; label.textContent = 'RESPOSTA';
     const content = document.createElement('p');
     content.textContent = item.resposta;
     answer.append(label, content);
     const reveal = document.createElement('button');
-    reveal.className = 'reveal-button'; reveal.type = 'button'; reveal.textContent = 'Mostrar resposta';
-    reveal.setAttribute('aria-expanded', 'false');
-    reveal.addEventListener('click', () => { answer.hidden = !answer.hidden; reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta'; reveal.setAttribute('aria-expanded', String(!answer.hidden)); });
+    reveal.className = 'reveal-button'; reveal.type = 'button'; reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta';
+    reveal.setAttribute('aria-expanded', String(!answer.hidden));
+    reveal.addEventListener('click', () => { answer.hidden = !answer.hidden; if (answer.hidden) state.revealedIds.delete(item.id); else state.revealedIds.add(item.id); reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta'; reveal.setAttribute('aria-expanded', String(!answer.hidden)); });
     card.append(top, menu, title, answer, reveal);
     return card;
   }
@@ -149,7 +190,7 @@
     const id = $('questionId').value;
     const now = new Date().toISOString();
     const existing = state.questions.find(item => item.id === id);
-    const updated = existing ? state.questions.map(item => item.id === id ? { ...item, pergunta, resposta, atualizadaEm: now } : item) : [{ id: crypto.randomUUID(), pergunta, resposta, criadaEm: now, atualizadaEm: now }, ...state.questions];
+    const updated = existing ? state.questions.map(item => item.id === id ? { ...item, pergunta, resposta, atualizadaEm: now } : item) : [{ id: crypto.randomUUID(), pergunta, resposta, dificil: false, criadaEm: now, atualizadaEm: now }, ...state.questions];
     if (persist(updated)) { $('formDialog').close(); notify(existing ? 'Pergunta atualizada.' : 'Pergunta adicionada.'); }
   }
 
@@ -203,7 +244,7 @@
       return;
     }
     const now = new Date().toISOString();
-    const incoming = pairs.map(({ pergunta, resposta }) => ({ id: crypto.randomUUID(), pergunta, resposta, criadaEm: now, atualizadaEm: now }));
+    const incoming = pairs.map(({ pergunta, resposta }) => ({ id: crypto.randomUUID(), pergunta, resposta, dificil: false, criadaEm: now, atualizadaEm: now }));
     if (persist([...incoming, ...state.questions])) {
       $('batchDialog').close();
       notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} adicionada${incoming.length === 1 ? '' : 's'}.`);
@@ -233,6 +274,7 @@
     $('progressFill').style.width = `${((state.studyIndex + 1) / state.studyIds.length) * 100}%`;
     $('studyQuestion').textContent = item.pergunta;
     $('studyAnswer').textContent = item.resposta;
+    updateDifficultButton($('studyDifficult'), item.dificil, true);
     $('studyAnswerBlock').hidden = !state.studyRevealed;
     $('studyReveal').textContent = state.studyRevealed ? 'Ocultar resposta' : 'Mostrar resposta';
     $('studyReveal').setAttribute('aria-expanded', String(state.studyRevealed));
@@ -241,8 +283,8 @@
   }
 
   function startStudy() {
-    if (!state.questions.length) return;
-    state.studyIds = orderedQuestions().map(item => item.id);
+    state.studyIds = visibleQuestions().map(item => item.id);
+    if (!state.studyIds.length) return;
     state.studyIndex = 0;
     state.studyRevealed = false;
     renderStudy();
@@ -292,11 +334,15 @@
     $('searchInput').addEventListener('input', render);
     $('shuffleButton').addEventListener('click', () => {
       state.shuffled = !state.shuffled;
-      state.displayIds = state.shuffled ? shuffle(state.questions.map(item => item.id)) : [];
+      state.displayIds = state.shuffled ? shuffle(visibleQuestions().map(item => item.id)) : [];
       $('shuffleButton').setAttribute('aria-pressed', String(state.shuffled));
       render();
     });
     $('studyButton').addEventListener('click', () => state.questions.length ? startStudy() : openForm());
+    for (const [id, filter] of [['filterAll', 'all'], ['filterDifficult', 'difficult']]) {
+      $(id).addEventListener('click', () => { state.filter = filter; render(); });
+    }
+    $('studyDifficult').addEventListener('click', () => toggleDifficult(state.studyIds[state.studyIndex], true));
     $('batchButton').addEventListener('click', () => { $('batchField').value = ''; updateBatchPreview(); $('batchDialog').showModal(); });
     $('batchField').addEventListener('input', updateBatchPreview);
     $('batchForm').addEventListener('submit', saveBatch);

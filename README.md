@@ -7,6 +7,7 @@ Aplicativo de revisão feito apenas com HTML, CSS e JavaScript. Funciona como si
 - Criar, editar, excluir e buscar perguntas.
 - Colar uma lista numerada de perguntas e respostas para cadastrar em lote.
 - Revelar a resposta em cada cartão.
+- Marcar perguntas com uma estrela e usar o filtro “Difíceis” para revisar somente elas. As marcações também são incluídas nos backups.
 - Revisar uma pergunta por vez, em ordem normal ou aleatória.
 - Salvar automaticamente no `localStorage` deste navegador.
 - Exportar e importar perguntas em arquivo JSON.
