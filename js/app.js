@@ -30,7 +30,7 @@
       const legacy = Array.isArray(stored);
       if (!legacy && (!stored || stored.version !== 2 || !Array.isArray(stored.listas) || !Array.isArray(stored.perguntas))) throw new Error('Formato inválido');
       const lists = legacy ? [] : stored.listas.filter(item => item && typeof item.id === 'string' && typeof item.nome === 'string' && item.nome.trim()).map(item => ({ id: item.id, nome: item.nome.trim() }));
-      state.lists = [{ id: GENERAL_ID, nome: 'Geral' }, ...lists.filter(item => item.id !== GENERAL_ID)];
+      state.lists = [{ id: GENERAL_ID, nome: lists.find(item => item.id === GENERAL_ID)?.nome || 'Geral' }, ...lists.filter(item => item.id !== GENERAL_ID)];
       const validIds = new Set(state.lists.map(item => item.id));
       state.questions = (legacy ? stored : stored.perguntas).filter(validQuestion).map(normalizeQuestion).map(item => validIds.has(item.listaId) ? item : { ...item, listaId: GENERAL_ID });
       if (legacy && localStorage.getItem(STORAGE_KEY) !== null) {
@@ -150,7 +150,7 @@
     const difficultFilter = state.filter === 'difficult';
     $('listName').textContent = currentList.nome;
     $('listSummary').textContent = `${listQuestions.length} pergunta${listQuestions.length === 1 ? '' : 's'} nesta lista · ★ ${difficultCount} ${difficultCount === 1 ? 'difícil' : 'difíceis'}`;
-    $('listOptionsButton').hidden = currentList.id === GENERAL_ID;
+    $('deleteListButton').hidden = currentList.id === GENERAL_ID;
     $('allCount').textContent = listQuestions.length;
     $('difficultCount').textContent = difficultCount;
     $('filterAll').setAttribute('aria-pressed', String(!difficultFilter));
@@ -325,9 +325,10 @@
     if (!id || id === GENERAL_ID) return;
     const list = state.lists.find(item => item.id === id);
     const count = state.questions.filter(item => item.listaId === id).length;
-    if (await confirmAction(`Excluir ${list.nome}?`, count ? `${count} pergunta${count === 1 ? '' : 's'} desta lista serão movidas para Geral, com respostas e estrelas preservadas.` : 'Esta lista vazia será excluída.', 'Excluir lista')) {
+    const generalName = state.lists.find(item => item.id === GENERAL_ID).nome;
+    if (await confirmAction(`Excluir ${list.nome}?`, count ? `${count} pergunta${count === 1 ? '' : 's'} desta lista serão movidas para ${generalName}, com respostas e estrelas preservadas.` : 'Esta lista vazia será excluída.', 'Excluir lista')) {
       const moved = state.questions.map(item => item.listaId === id ? { ...item, listaId: GENERAL_ID } : item);
-      if (persist(moved, state.lists.filter(item => item.id !== id))) notify('Lista excluída. Perguntas movidas para Geral.');
+      if (persist(moved, state.lists.filter(item => item.id !== id))) notify(`Lista excluída. Perguntas movidas para ${generalName}.`);
     }
   }
 
@@ -454,10 +455,19 @@
       if (data.version === 2) {
         for (const list of data.listas) {
           const name = list.nome.trim();
-          const existing = nextLists.find(item => item.nome.toLocaleLowerCase('pt-BR') === name.toLocaleLowerCase('pt-BR'));
-          const id = list.id === GENERAL_ID || name.toLocaleLowerCase('pt-BR') === 'geral' ? GENERAL_ID : existing?.id || crypto.randomUUID();
+          const existing = nextLists.find(item => item.id !== GENERAL_ID && item.nome.toLocaleLowerCase('pt-BR') === name.toLocaleLowerCase('pt-BR'));
+          const id = list.id === GENERAL_ID ? GENERAL_ID : existing?.id || crypto.randomUUID();
           listIds.set(list.id, id);
-          if (!nextLists.some(item => item.id === id)) nextLists.push({ id, nome: name });
+          if (!nextLists.some(item => item.id === id)) {
+            let uniqueName = name;
+            let suffix = 1;
+            while (nextLists.some(item => item.nome.toLocaleLowerCase('pt-BR') === uniqueName.toLocaleLowerCase('pt-BR'))) {
+              const ending = suffix === 1 ? ' (importada)' : ` (importada ${suffix})`;
+              uniqueName = `${name.slice(0, 60 - ending.length)}${ending}`;
+              suffix++;
+            }
+            nextLists.push({ id, nome: uniqueName });
+          }
         }
       }
       const existingIds = new Set(state.questions.map(item => item.id));
