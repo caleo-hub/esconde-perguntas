@@ -27,6 +27,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
+.auth-screen { display: grid; place-items: center; min-height: 100svh; padding: 24px 18px calc(24px + env(safe-area-inset-bottom)); }
+.auth-card { width: min(100%, 440px); padding: 28px; border: 1px solid var(--line); border-radius: 22px; background: var(--surface); box-shadow: 0 24px 70px #0003; }
+.auth-card>.brand { margin-bottom: 42px; }
+.auth-eyebrow { margin-bottom: 12px; }
+.auth-card h1 { margin: 0 0 8px; font-size: clamp(30px, 8vw, 38px); letter-spacing: -.05em; }
+.auth-card>p { margin: 0 0 26px; color: var(--muted); line-height: 1.5; }
+.auth-card form>label, .auth-card #confirmPasswordGroup>label { display: block; margin: 0 0 8px; font-size: 14px; font-weight: 750; }
+.auth-card .text-field { margin-bottom: 18px; }
+.auth-card .save-button { position: static; margin-top: 4px; box-shadow: none; }
+.auth-link { display: block; width: 100%; min-height: 44px; margin-top: 8px; border: 0; border-radius: 10px; background: transparent; color: var(--accent); font-weight: 700; }
+.auth-link:hover { background: var(--accent-soft); }
+.legacy-import { margin: -2px 0 18px; padding: 4px 12px; border: 1px solid var(--accent-line); border-radius: 14px; background: var(--accent-soft); }
+.legacy-import-label { display: flex; align-items: flex-start; gap: 12px; min-height: 56px; padding: 9px 0; cursor: pointer; }
+.legacy-import-label input { flex: 0 0 22px; width: 22px; height: 22px; margin: 3px 0 0; accent-color: var(--accent); }
+.legacy-import-label span { display: grid; gap: 4px; line-height: 1.4; }
+.legacy-import-label strong { font-size: 14px; }
+.legacy-import-label small { color: var(--muted); font-size: 12px; }
+
 .app-shell { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 18px calc(112px + env(safe-area-inset-bottom)); }
 .topbar { position: relative; z-index: 4; display: flex; justify-content: space-between; align-items: center; height: 72px; }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 15px; line-height: 1.03; letter-spacing: -.03em; font-weight: 500; }

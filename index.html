@@ -10,10 +10,35 @@
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <link rel="manifest" href="./manifest.json">
   <link rel="stylesheet" href="./css/style.css">
+  <script src="./vendor/firebase/firebase-app-compat.js" defer></script>
+  <script src="./vendor/firebase/firebase-auth-compat.js" defer></script>
+  <script src="./vendor/firebase/firebase-firestore-compat.js" defer></script>
+  <script src="./js/firebase-config.js" defer></script>
+  <script src="./js/firebase-cloud.js" defer></script>
   <script src="./js/app.js" defer></script>
 </head>
 <body>
-  <div class="app-shell">
+  <section id="authView" class="auth-screen" aria-labelledby="authTitle">
+    <div class="auth-card">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">?</span><span>Esconde<br><strong>Perguntas</strong></span></div>
+      <div class="eyebrow auth-eyebrow">SEUS ESTUDOS, COM VOCÊ</div>
+      <h1 id="authTitle">Entre na sua conta</h1>
+      <p id="authDescription">Suas listas ficam salvas e sincronizadas na sua conta.</p>
+      <form id="authForm" novalidate>
+        <label for="authEmail">E-mail</label>
+        <input id="authEmail" class="text-field" type="email" autocomplete="email" placeholder="voce@email.com" required>
+        <label for="authPassword">Senha</label>
+        <input id="authPassword" class="text-field" type="password" autocomplete="current-password" minlength="6" placeholder="Pelo menos 6 caracteres" required>
+        <div id="confirmPasswordGroup" hidden><label for="authPasswordConfirm">Confirmar senha</label><input id="authPasswordConfirm" class="text-field" type="password" autocomplete="new-password" minlength="6" placeholder="Digite a senha novamente"></div>
+        <div id="legacyImportGroup" class="legacy-import" hidden><label class="legacy-import-label" for="importLegacyQuestions"><input id="importLegacyQuestions" type="checkbox" checked><span><strong>Salvar minhas perguntas antigas nesta conta</strong><small id="legacyImportDescription">As perguntas deste aparelho serão copiadas para sua conta.</small></span></label></div>
+        <p id="authError" class="form-error" role="alert" hidden></p>
+        <button id="authSubmit" class="primary-button save-button" type="submit">Entrar</button>
+      </form>
+      <button id="authModeButton" class="auth-link" type="button">Criar uma conta</button>
+      <button id="resetPasswordButton" class="auth-link" type="button">Esqueci minha senha</button>
+    </div>
+  </section>
+  <div id="appShell" class="app-shell" hidden>
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">?</span><span>Esconde<br><strong>Perguntas</strong></span></div>
       <button id="menuButton" class="icon-button" type="button" aria-label="Abrir menu" aria-haspopup="menu" aria-expanded="false">⋮</button>
@@ -22,6 +47,7 @@
         <button type="button" role="menuitem" id="exportButton">Exportar backup</button>
         <button type="button" role="menuitem" id="installButton" hidden>Instalar aplicativo</button>
         <button type="button" role="menuitem" id="aboutButton">Sobre o aplicativo</button>
+        <button type="button" role="menuitem" id="signOutButton">Sair da conta</button>
         <button type="button" role="menuitem" id="deleteAllButton" class="danger-text">Apagar todos os dados</button>
       </div>
     </header>

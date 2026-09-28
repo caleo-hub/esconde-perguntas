@@ -4,8 +4,10 @@
   const STORAGE_KEY = 'escondePerguntas';
   const GENERAL_ID = 'geral';
   const $ = id => document.getElementById(id);
-  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyIndex: 0, studyRevealed: false, installPrompt: null };
+  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyIndex: 0, studyRevealed: false, installPrompt: null, user: null, storageKey: STORAGE_KEY, authMode: 'login', importLegacyOnLogin: false };
   let toastTimer;
+
+  function accountStorageKey() { return state.user ? `${STORAGE_KEY}:${state.user.uid}` : STORAGE_KEY; }
 
   function validQuestion(item) {
     return item && typeof item === 'object' && typeof item.pergunta === 'string' && typeof item.resposta === 'string' && item.pergunta.trim() && item.resposta.trim() && item.pergunta.length <= 2000 && item.resposta.length <= 10000;
@@ -24,17 +26,17 @@
     toastTimer = setTimeout(() => { toast.hidden = true; }, 3500);
   }
 
-  function load() {
+  function load(key = accountStorageKey()) {
     try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      const stored = JSON.parse(localStorage.getItem(key) || '[]');
       const legacy = Array.isArray(stored);
       if (!legacy && (!stored || stored.version !== 2 || !Array.isArray(stored.listas) || !Array.isArray(stored.perguntas))) throw new Error('Formato inválido');
       const lists = legacy ? [] : stored.listas.filter(item => item && typeof item.id === 'string' && typeof item.nome === 'string' && item.nome.trim()).map(item => ({ id: item.id, nome: item.nome.trim() }));
       state.lists = [{ id: GENERAL_ID, nome: lists.find(item => item.id === GENERAL_ID)?.nome || 'Geral' }, ...lists.filter(item => item.id !== GENERAL_ID)];
       const validIds = new Set(state.lists.map(item => item.id));
       state.questions = (legacy ? stored : stored.perguntas).filter(validQuestion).map(normalizeQuestion).map(item => validIds.has(item.listaId) ? item : { ...item, listaId: GENERAL_ID });
-      if (legacy && localStorage.getItem(STORAGE_KEY) !== null) {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, listas: state.lists, perguntas: state.questions })); }
+      if (legacy && localStorage.getItem(key) !== null) {
+        try { localStorage.setItem(key, JSON.stringify({ version: 2, listas: state.lists, perguntas: state.questions })); }
         catch (error) { notify('Não foi possível atualizar os dados salvos. Exporte um backup antes de fechar o navegador.'); }
       }
     } catch (error) {
@@ -46,10 +48,11 @@
 
   function persist(next, nextLists = state.lists) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, listas: nextLists, perguntas: next }));
+      localStorage.setItem(accountStorageKey(), JSON.stringify({ version: 2, listas: nextLists, perguntas: next }));
       state.questions = next;
       state.lists = nextLists;
       render();
+      if (state.user) FirebaseCloud.saveDelta(nextLists, next).catch(() => notify('Salvo neste aparelho. A sincronização será tentada quando a conexão voltar.'));
       return true;
     } catch (error) {
       notify('Não foi possível salvar. Verifique o espaço ou as permissões do navegador.');
@@ -541,8 +544,179 @@
 
   function closeMenu() { $('menu').hidden = true; $('menuButton').setAttribute('aria-expanded', 'false'); }
 
+  function mergeById(primary, secondary) {
+    const merged = new Map(primary.map(item => [item.id, item]));
+    for (const item of secondary) if (!merged.has(item.id)) merged.set(item.id, item);
+    return [...merged.values()];
+  }
+
+  function cacheCurrentAccount() {
+    localStorage.setItem(accountStorageKey(), JSON.stringify({ version: 2, listas: state.lists, perguntas: state.questions }));
+  }
+
+  function legacyQuestionCount() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+      const questions = Array.isArray(stored) ? stored : stored?.perguntas;
+      return Array.isArray(questions) ? questions.filter(validQuestion).length : 0;
+    } catch { return 0; }
+  }
+
+  function activateAccount(user) {
+    state.user = user;
+    state.storageKey = accountStorageKey();
+    const ownSaved = localStorage.getItem(state.storageKey);
+    const hasLegacyData = !ownSaved && state.importLegacyOnLogin && legacyQuestionCount() > 0;
+    state.importLegacyOnLogin = false;
+    state.questions = [];
+    state.lists = [{ id: GENERAL_ID, nome: 'Geral' }];
+    load(ownSaved ? state.storageKey : hasLegacyData ? STORAGE_KEY : state.storageKey);
+    const localQuestions = [...state.questions];
+    const localLists = [...state.lists];
+    state.currentListId = null;
+    $('authView').hidden = false;
+    $('appShell').hidden = true;
+    $('authTitle').textContent = 'Carregando seus estudos';
+    $('authDescription').textContent = 'Estamos buscando suas listas salvas na sua conta.';
+    $('authForm').hidden = true;
+    $('authModeButton').hidden = true;
+    $('resetPasswordButton').hidden = true;
+    const finishLoading = () => { $('authView').hidden = true; $('appShell').hidden = false; };
+    FirebaseCloud.watch(user.uid, (remote, initial, error) => {
+      if (initial) {
+        if (error) {
+          state.questions = localQuestions;
+          state.lists = localLists;
+          cacheCurrentAccount();
+          render();
+          finishLoading();
+          notify('Firebase indisponível. Seus dados seguem neste aparelho até a sincronização ser liberada.');
+          return;
+        }
+        const remoteHasData = remote.questions.length > 0 || remote.lists.some(list => list.id !== GENERAL_ID) || remote.lists.some(list => list.id === GENERAL_ID && list.nome !== 'Geral');
+        if (!remoteHasData) {
+          state.questions = localQuestions;
+          state.lists = localLists;
+          if (!state.lists.some(list => list.id === GENERAL_ID)) state.lists.unshift({ id: GENERAL_ID, nome: 'Geral' });
+          cacheCurrentAccount();
+          FirebaseCloud.saveAll(state.lists, state.questions).then(() => {
+            if (hasLegacyData) localStorage.removeItem(STORAGE_KEY);
+            notify('Suas perguntas estão salvas e sincronizadas na conta.');
+          }).catch(() => notify('Conta conectada. Os dados locais serão sincronizados quando o Firebase estiver configurado.'));
+          render();
+          finishLoading();
+          return;
+        }
+        const useLegacy = hasLegacyData;
+        state.lists = mergeById(remote.lists, useLegacy ? localLists : []);
+        if (!state.lists.some(list => list.id === GENERAL_ID)) state.lists.unshift({ id: GENERAL_ID, nome: 'Geral' });
+        state.questions = mergeById(remote.questions, useLegacy ? localQuestions : []);
+        cacheCurrentAccount();
+        render();
+        finishLoading();
+        if (useLegacy) {
+          FirebaseCloud.saveAll(state.lists, state.questions).then(() => {
+            localStorage.removeItem(STORAGE_KEY);
+            notify('Suas perguntas deste aparelho foram adicionadas à conta.');
+          }).catch(() => notify('Não foi possível sincronizar os dados locais. Eles continuam salvos neste aparelho.'));
+        }
+        return;
+      }
+      const latest = JSON.stringify({ lists: state.lists, questions: state.questions });
+      const incoming = JSON.stringify({ lists: remote.lists, questions: remote.questions });
+      if (latest === incoming) return;
+      if (FirebaseCloud.isDirty()) {
+        state.lists = mergeById(remote.lists, state.lists);
+        state.questions = mergeById(remote.questions, state.questions);
+        cacheCurrentAccount();
+        render();
+        FirebaseCloud.saveAll(state.lists, state.questions).catch(() => {});
+        return;
+      }
+      state.lists = remote.lists;
+      state.questions = remote.questions;
+      if (!state.lists.some(list => list.id === GENERAL_ID)) state.lists.unshift({ id: GENERAL_ID, nome: 'Geral' });
+      cacheCurrentAccount();
+      render();
+      notify('Perguntas sincronizadas.');
+    });
+  }
+
+  function setAuthMode(mode) {
+    state.authMode = mode;
+    const registering = mode === 'register';
+    $('authTitle').textContent = registering ? 'Crie sua conta' : 'Entre na sua conta';
+    $('authDescription').textContent = registering ? 'Use seu e-mail e uma senha para guardar suas listas na nuvem.' : 'Suas listas ficam salvas e sincronizadas na sua conta.';
+    $('authSubmit').textContent = registering ? 'Criar conta' : 'Entrar';
+    $('authModeButton').textContent = registering ? 'Já tenho uma conta' : 'Criar uma conta';
+    $('confirmPasswordGroup').hidden = !registering;
+    const legacyCount = legacyQuestionCount();
+    $('legacyImportGroup').hidden = !registering || legacyCount === 0;
+    $('legacyImportDescription').textContent = legacyCount === 1
+      ? '1 pergunta salva neste aparelho será copiada para sua conta.'
+      : `${legacyCount} perguntas salvas neste aparelho serão copiadas para sua conta.`;
+    if (!registering) state.importLegacyOnLogin = false;
+    $('authPassword').autocomplete = registering ? 'new-password' : 'current-password';
+    $('resetPasswordButton').hidden = registering;
+    $('authForm').hidden = false;
+    $('authModeButton').hidden = false;
+    $('authError').hidden = true;
+  }
+
+  function showAuthError(error) {
+    const messages = {
+      'auth/email-already-in-use': 'Este e-mail já tem uma conta. Entre com sua senha.',
+      'auth/invalid-email': 'Digite um endereço de e-mail válido.',
+      'auth/weak-password': 'Escolha uma senha com pelo menos 6 caracteres.',
+      'auth/invalid-credential': 'E-mail ou senha incorretos.',
+      'auth/user-not-found': 'Não encontramos uma conta com esse e-mail.',
+      'auth/wrong-password': 'Senha incorreta.',
+      'auth/operation-not-allowed': 'O acesso por e-mail e senha ainda precisa ser ativado no Firebase Authentication.',
+      'auth/unauthorized-domain': 'Este endereço ainda não está autorizado no Firebase Authentication.',
+      'auth/network-request-failed': 'Sem conexão com a internet. Tente novamente quando estiver online.'
+    };
+    $('authError').textContent = messages[error?.code] || 'Não foi possível concluir. Confira os dados e tente novamente.';
+    $('authError').hidden = false;
+  }
+
+  async function submitAuth(event) {
+    event.preventDefault();
+    $('authError').hidden = true;
+    const email = $('authEmail').value.trim();
+    const password = $('authPassword').value;
+    try {
+      if (state.authMode === 'register') {
+        if (password !== $('authPasswordConfirm').value) throw Object.assign(new Error('Senhas diferentes'), { code: 'auth/password-mismatch' });
+        state.importLegacyOnLogin = !$('legacyImportGroup').hidden && $('importLegacyQuestions').checked;
+        await FirebaseCloud.createAccount(email, password);
+      } else await FirebaseCloud.signIn(email, password);
+    } catch (error) { state.importLegacyOnLogin = false; showAuthError(error); }
+  }
+
+  async function resetPassword() {
+    const email = $('authEmail').value.trim();
+    if (!email) { $('authError').textContent = 'Digite seu e-mail para receber o link de redefinição.'; $('authError').hidden = false; $('authEmail').focus(); return; }
+    try { await FirebaseCloud.resetPassword(email); notify('Enviamos um link para redefinir sua senha.'); }
+    catch (error) { showAuthError(error); }
+  }
+
   function setup() {
-    load(); render();
+    $('authForm').addEventListener('submit', submitAuth);
+    $('authModeButton').addEventListener('click', () => setAuthMode(state.authMode === 'login' ? 'register' : 'login'));
+    $('resetPasswordButton').addEventListener('click', resetPassword);
+    FirebaseCloud.auth.onAuthStateChanged(user => {
+      if (user) activateAccount(user);
+      else {
+        FirebaseCloud.stopSync();
+        state.user = null;
+        state.questions = [];
+        state.lists = [{ id: GENERAL_ID, nome: 'Geral' }];
+        state.currentListId = null;
+        $('appShell').hidden = true;
+        $('authView').hidden = false;
+        setAuthMode('login');
+      }
+    }, error => showAuthError(error));
     $('newListButton').addEventListener('click', () => openListForm());
     $('listForm').addEventListener('submit', saveListForm);
     $('backButton').addEventListener('click', () => { state.currentListId = null; render(); window.scrollTo(0, 0); });
@@ -581,6 +755,7 @@
     $('studyShuffle').addEventListener('click', () => { state.studyIds = shuffle(state.studyIds); state.studyIndex = 0; state.studyRevealed = false; renderStudy(); notify('Revisão embaralhada.'); });
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => $(button.dataset.close).close()));
     $('menuButton').addEventListener('click', () => { $('menu').hidden = !$('menu').hidden; $('menuButton').setAttribute('aria-expanded', String(!$('menu').hidden)); });
+    $('signOutButton').addEventListener('click', async () => { closeMenu(); try { await FirebaseCloud.auth.signOut(); } catch (error) { notify('Não foi possível sair da conta.'); } });
     document.addEventListener('click', event => { if (!$('menu').contains(event.target) && !$('menuButton').contains(event.target)) closeMenu(); });
     document.addEventListener('click', event => { if (!$('listOptions').contains(event.target) && !$('listOptionsButton').contains(event.target)) { $('listOptions').hidden = true; $('listOptionsButton').setAttribute('aria-expanded', 'false'); } });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMenu(); });
