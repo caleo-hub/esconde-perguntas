@@ -82,6 +82,14 @@
     return orderedQuestions().filter(item => item.listaId === state.currentListId && (state.filter === 'all' || (state.filter === 'difficult' && item.dificil) || (state.filter === 'very' && item.muitoDificil)) && item.pergunta.toLocaleLowerCase('pt-BR').includes(query));
   }
 
+  function updateShuffleButton(visibleCount) {
+    const button = $('shuffleButton');
+    button.innerHTML = state.shuffled ? '<span aria-hidden="true">↺</span> Ordem normal' : '<span aria-hidden="true">⇄</span> Embaralhar';
+    button.setAttribute('aria-pressed', String(state.shuffled));
+    button.setAttribute('aria-label', state.shuffled ? 'Desembaralhar perguntas e voltar à ordem normal' : 'Embaralhar perguntas exibidas');
+    button.disabled = !state.shuffled && visibleCount < 2;
+  }
+
   function updateDifficultButton(button, difficult, withText = false) {
     button.textContent = withText ? (difficult ? '★ Difícil' : '☆ Marcar difícil') : (difficult ? '★' : '☆');
     button.setAttribute('aria-pressed', String(difficult));
@@ -150,7 +158,6 @@
     state.filter = 'all';
     state.shuffled = false;
     state.displayIds = [];
-    $('shuffleButton').setAttribute('aria-pressed', 'false');
     $('searchInput').value = '';
     $('listOptions').hidden = true;
     $('listOptionsButton').setAttribute('aria-expanded', 'false');
@@ -213,7 +220,7 @@
     $('heroActionText').textContent = veryFilter ? 'Revisar muito difíceis' : difficultFilter ? 'Revisar difíceis' : (listQuestions.length ? 'Começar revisão' : 'Criar pergunta');
     $('studyButton').disabled = !visible.length && (state.filter !== 'all' || listQuestions.length > 0);
     $('addButton').hidden = listQuestions.length === 0;
-    $('shuffleButton').disabled = visible.length < 2;
+    updateShuffleButton(visible.length);
     updateRevealAllButton(visible);
     const list = $('questionList');
     list.replaceChildren(...visible.map((item, index) => createCard(item, index)));
@@ -740,9 +747,9 @@
     $('searchInput').addEventListener('input', render);
     $('revealAllButton').addEventListener('click', toggleRevealAll);
     $('shuffleButton').addEventListener('click', () => {
+      const visibleIds = visibleQuestions().map(item => item.id);
       state.shuffled = !state.shuffled;
-      state.displayIds = state.shuffled ? shuffle(visibleQuestions().map(item => item.id)) : [];
-      $('shuffleButton').setAttribute('aria-pressed', String(state.shuffled));
+      state.displayIds = state.shuffled ? shuffle(visibleIds) : [];
       render();
     });
     $('studyButton').addEventListener('click', () => state.questions.some(item => item.listaId === state.currentListId) ? startStudy() : openForm());

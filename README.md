@@ -10,6 +10,7 @@ Aplicativo de revisão feito apenas com HTML, CSS e JavaScript. Funciona como si
 - Marcar perguntas como ★ Difíceis e promover as mais trabalhosas a ! Muito difíceis. O filtro ★ inclui os dois níveis; o filtro ! mostra somente o nível mais alto. As marcações entram nos backups.
 - Criar listas por assunto, mover perguntas entre listas e revisar cada assunto separadamente.
 - Revisar as perguntas em uma lista com rolagem e revelar cada resposta no próprio cartão, em ordem normal ou aleatória.
+- Embaralhar as perguntas e voltar à ordem normal com o mesmo botão. Os cartões ficam sempre em uma coluna, inclusive em tablets e computadores.
 - Entrar ou criar uma conta com e-mail e senha; listas e perguntas são sincronizadas no Firestore e isoladas por conta.
 - Guardar uma cópia local para continuar usando as perguntas neste navegador.
 - Exportar e importar perguntas em arquivo JSON.
