@@ -1,4 +1,4 @@
-const CACHE_NAME = 'esconde-perguntas-v9';
+const CACHE_NAME = 'esconde-perguntas-v10';
 const APP_FILES = ['./', './index.html', './css/style.css', './js/app.js', './js/firebase-config.js', './js/firebase-cloud.js', './vendor/firebase/firebase-app-compat.js', './vendor/firebase/firebase-auth-compat.js', './vendor/firebase/firebase-firestore-compat.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', event => {

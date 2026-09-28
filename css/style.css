@@ -126,8 +126,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .very-button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 1px solid var(--accent-line); border-radius: 11px; background: var(--accent-soft); color: var(--accent); font-size: 22px; font-weight: 850; cursor: pointer; }
 .very-button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
 .very-button:hover { filter: brightness(1.13); }
-.study-difficulty-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
-.study-difficult, .study-very { font-size: 14px; font-weight: 750; }
 .question-card { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); }
 .card-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .card-number { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .13em; }
@@ -141,7 +139,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .reveal-button:hover { background: #a497ff32; }
 .card-answer { margin: 0 0 19px; padding-top: 19px; border-top: 1px solid var(--line); }
 .card-answer .eyebrow { margin-bottom: 11px; }
-.card-answer p, .study-answer p { margin: 0; color: var(--text); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.card-answer p { margin: 0; color: var(--text); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .empty-state { padding: 37px 18px; border: 1px dashed var(--line); border-radius: 17px; background: var(--surface); text-align: center; }
 .empty-icon { margin-bottom: 8px; color: var(--accent); font-size: 30px; }
 .empty-state h3 { margin: 0 0 7px; font-size: 19px; }
@@ -180,19 +178,12 @@ dialog::backdrop { background: #05070bcc; backdrop-filter: blur(5px); }
 .batch-guide summary { min-height: 44px; padding: 11px 0; color: var(--accent); font-size: 14px; font-weight: 750; cursor: pointer; }
 .batch-guide[open] summary { margin-bottom: 8px; }
 
-.study-panel { min-height: 0; }
-.study-top { display: flex; justify-content: space-between; align-items: center; color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .15em; }
-.study-progress { margin: 18px 0 0; color: var(--muted); font-size: 13px; }
-.progress-track { height: 4px; margin-top: 11px; border-radius: 5px; background: var(--surface-2); }
-.progress-track div { height: 100%; border-radius: 5px; background: var(--accent); transition: width .2s; }
-.study-body { flex: 1; min-height: 0; overflow-y: auto; padding: 38px 2px 20px; }
-.study-body h2 { margin: 14px 0 33px; font-size: clamp(25px, 7vw, 38px); line-height: 1.3; letter-spacing: -.035em; white-space: pre-wrap; overflow-wrap: anywhere; }
-.study-answer { padding-top: 24px; border-top: 1px solid var(--line); }
-.study-answer p { margin-top: 14px; font-size: 17px; }
-.study-actions { padding-top: 12px; }
-.study-actions>.primary-button { width: 100%; min-height: 54px; }
-.study-nav { display: flex; gap: 10px; margin-top: 10px; }
-.study-nav button { flex: 1; min-width: 0; }
+.study-panel { min-height: 0; overflow: hidden; padding: 0; background: var(--bg); }
+.study-header { flex: 0 0 auto; padding: 12px 18px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.study-back { margin: 0 0 14px; }
+.study-header h2 { margin: 7px 0 4px; font-size: clamp(27px, 8vw, 36px); letter-spacing: -.045em; overflow-wrap: anywhere; }
+.study-header p { margin: 0; color: var(--muted); font-size: 14px; }
+.study-list.question-list { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; grid-template-columns: minmax(0, 1fr); padding: 16px 18px calc(20px + env(safe-area-inset-bottom)); }
 .confirm-dialog { width: min(420px, calc(100vw - 28px)); border-radius: 20px; }
 .confirm-panel { padding: 25px; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); }
 .confirm-panel h2 { margin: 10px 0; font-size: 24px; letter-spacing: -.04em; }
@@ -223,7 +214,9 @@ dialog::backdrop { background: #05070bcc; backdrop-filter: blur(5px); }
   .dialog-head { top: -25px; margin: -25px -25px 20px; padding: 25px 25px 15px; border-radius: 20px 20px 0 0; }
   .save-button { bottom: -25px; }
   .study-dialog { width: min(620px, calc(100vw - 40px)); height: min(730px, calc(100dvh - 40px)); max-height: calc(100dvh - 40px); margin: auto; border-radius: 20px; }
-  .study-panel { padding: 25px; border: 1px solid var(--line); border-radius: 20px; }
+  .study-panel { border: 1px solid var(--line); border-radius: 20px; }
+  .study-header { padding: 18px 24px; }
+  .study-list { padding: 20px 24px 24px; }
   .toast { bottom: 25px; }
 }
 

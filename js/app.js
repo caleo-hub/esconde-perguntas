@@ -4,7 +4,7 @@
   const STORAGE_KEY = 'escondePerguntas';
   const GENERAL_ID = 'geral';
   const $ = id => document.getElementById(id);
-  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyIndex: 0, studyRevealed: false, installPrompt: null, user: null, storageKey: STORAGE_KEY, authMode: 'login', importLegacyOnLogin: false };
+  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyRevealedIds: new Set(), installPrompt: null, user: null, storageKey: STORAGE_KEY, authMode: 'login', importLegacyOnLogin: false };
   let toastTimer;
 
   function accountStorageKey() { return state.user ? `${STORAGE_KEY}:${state.user.uid}` : STORAGE_KEY; }
@@ -117,22 +117,31 @@
     const item = state.questions.find(question => question.id === id);
     if (!item) return;
     if (!persist(state.questions.map(question => question.id === id ? { ...question, dificil: !question.dificil, muitoDificil: false, atualizadaEm: new Date().toISOString() } : question))) return;
-    if (fromStudy) renderStudy();
-    else {
-      const card = [...$('questionList').children].find(element => element.dataset.id === id);
-      (card?.querySelector('.difficult-button') || $('filterDifficult')).focus({ preventScroll: true });
-    }
+    if (fromStudy) updateStudyDifficulty(id);
+    else focusCardDifficulty(id, '.difficult-button', 'filterDifficult');
   }
 
   function toggleVeryDifficult(id, fromStudy = false) {
     const item = state.questions.find(question => question.id === id);
     if (!item?.dificil) return;
     if (!persist(state.questions.map(question => question.id === id ? { ...question, muitoDificil: !question.muitoDificil, atualizadaEm: new Date().toISOString() } : question))) return;
-    if (fromStudy) renderStudy();
-    else {
-      const card = [...$('questionList').children].find(element => element.dataset.id === id);
-      (card?.querySelector('.very-button') || $('filterVery')).focus({ preventScroll: true });
-    }
+    if (fromStudy) updateStudyDifficulty(id);
+    else focusCardDifficulty(id, '.very-button', 'filterVery');
+  }
+
+  function focusCardDifficulty(id, selector, fallbackId) {
+    const card = [...$('questionList').children].find(element => element.dataset.id === id);
+    (card?.querySelector(selector) || $(fallbackId)).focus({ preventScroll: true });
+  }
+
+  function updateStudyDifficulty(id) {
+    const item = state.questions.find(question => question.id === id);
+    const card = [...$('studyList').children].find(element => element.dataset.id === id);
+    if (!item || !card) return;
+    updateDifficultButton(card.querySelector('.difficult-button'), item.dificil);
+    const very = card.querySelector('.very-button');
+    very.hidden = !item.dificil;
+    updateVeryButton(very, item.muitoDificil);
   }
 
   function openList(id) {
@@ -221,7 +230,7 @@
     }
   }
 
-  function createCard(item, index) {
+  function createCard(item, index, inStudy = false) {
     const card = document.createElement('article');
     card.className = 'question-card';
     card.dataset.id = item.id;
@@ -230,49 +239,53 @@
     const number = document.createElement('span');
     number.className = 'card-number';
     number.textContent = String(index + 1).padStart(2, '0');
-    const menuButton = document.createElement('button');
-    menuButton.className = 'card-menu-button';
-    menuButton.type = 'button';
-    menuButton.setAttribute('aria-label', 'Opções da pergunta');
-    menuButton.setAttribute('aria-expanded', 'false');
-    menuButton.textContent = '⋮';
     const actions = document.createElement('div');
     actions.className = 'card-actions';
     const difficult = document.createElement('button');
     difficult.type = 'button';
     difficult.className = 'difficult-button';
     updateDifficultButton(difficult, item.dificil);
-    difficult.addEventListener('click', () => toggleDifficult(item.id));
+    difficult.addEventListener('click', () => toggleDifficult(item.id, inStudy));
     const very = document.createElement('button');
     very.type = 'button';
     very.className = 'very-button';
     very.hidden = !item.dificil;
     updateVeryButton(very, item.muitoDificil);
-    very.addEventListener('click', () => toggleVeryDifficult(item.id));
-    actions.append(difficult, very, menuButton);
+    very.addEventListener('click', () => toggleVeryDifficult(item.id, inStudy));
+    actions.append(difficult, very);
     top.append(number, actions);
-    const menu = document.createElement('div');
-    menu.className = 'card-menu';
-    menu.hidden = true;
-    const edit = document.createElement('button');
-    edit.type = 'button'; edit.textContent = 'Editar';
-    edit.addEventListener('click', () => openForm(item));
-    const move = document.createElement('button');
-    move.type = 'button'; move.textContent = 'Mover';
-    move.addEventListener('click', () => openMove(item));
-    const remove = document.createElement('button');
-    remove.type = 'button'; remove.textContent = 'Excluir';
-    remove.addEventListener('click', async () => {
-      if (await confirmAction('Excluir pergunta?', 'Esta pergunta e sua resposta serão apagadas deste navegador.')) {
-        if (persist(state.questions.filter(question => question.id !== item.id))) notify('Pergunta excluída.');
-      }
-    });
-    menu.append(edit, move, remove);
-    menuButton.addEventListener('click', () => { menu.hidden = !menu.hidden; menuButton.setAttribute('aria-expanded', String(!menu.hidden)); });
+    if (!inStudy) {
+      const menuButton = document.createElement('button');
+      menuButton.className = 'card-menu-button';
+      menuButton.type = 'button';
+      menuButton.setAttribute('aria-label', 'Opções da pergunta');
+      menuButton.setAttribute('aria-expanded', 'false');
+      menuButton.textContent = '⋮';
+      actions.append(menuButton);
+      const menu = document.createElement('div');
+      menu.className = 'card-menu';
+      menu.hidden = true;
+      const edit = document.createElement('button');
+      edit.type = 'button'; edit.textContent = 'Editar';
+      edit.addEventListener('click', () => openForm(item));
+      const move = document.createElement('button');
+      move.type = 'button'; move.textContent = 'Mover';
+      move.addEventListener('click', () => openMove(item));
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.textContent = 'Excluir';
+      remove.addEventListener('click', async () => {
+        if (await confirmAction('Excluir pergunta?', 'Esta pergunta e sua resposta serão apagadas deste navegador.')) {
+          if (persist(state.questions.filter(question => question.id !== item.id))) notify('Pergunta excluída.');
+        }
+      });
+      menu.append(edit, move, remove);
+      menuButton.addEventListener('click', () => { menu.hidden = !menu.hidden; menuButton.setAttribute('aria-expanded', String(!menu.hidden)); });
+      card.append(top, menu);
+    } else card.append(top);
     const title = document.createElement('h3');
     title.textContent = item.pergunta;
     const answer = document.createElement('div');
-    answer.className = 'card-answer'; answer.hidden = !state.revealedIds.has(item.id);
+    answer.className = 'card-answer'; answer.hidden = !(inStudy ? state.studyRevealedIds : state.revealedIds).has(item.id);
     const label = document.createElement('div');
     label.className = 'eyebrow'; label.textContent = 'RESPOSTA';
     const content = document.createElement('p');
@@ -281,8 +294,15 @@
     const reveal = document.createElement('button');
     reveal.className = 'reveal-button'; reveal.type = 'button'; reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta';
     reveal.setAttribute('aria-expanded', String(!answer.hidden));
-    reveal.addEventListener('click', () => { answer.hidden = !answer.hidden; if (answer.hidden) state.revealedIds.delete(item.id); else state.revealedIds.add(item.id); reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta'; reveal.setAttribute('aria-expanded', String(!answer.hidden)); updateRevealAllButton(); });
-    card.append(top, menu, title, answer, reveal);
+    reveal.addEventListener('click', () => {
+      const revealedIds = inStudy ? state.studyRevealedIds : state.revealedIds;
+      answer.hidden = !answer.hidden;
+      if (answer.hidden) revealedIds.delete(item.id); else revealedIds.add(item.id);
+      reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta';
+      reveal.setAttribute('aria-expanded', String(!answer.hidden));
+      if (!inStudy) updateRevealAllButton();
+    });
+    card.append(title, answer, reveal);
     return card;
   }
 
@@ -462,29 +482,20 @@
   }
 
   function renderStudy() {
-    const item = state.questions.find(question => question.id === state.studyIds[state.studyIndex]);
-    if (!item) { $('studyDialog').close(); return; }
-    $('studyCounter').textContent = `Pergunta ${state.studyIndex + 1} de ${state.studyIds.length}`;
-    $('progressFill').style.width = `${((state.studyIndex + 1) / state.studyIds.length) * 100}%`;
-    $('studyQuestion').textContent = item.pergunta;
-    $('studyAnswer').textContent = item.resposta;
-    updateDifficultButton($('studyDifficult'), item.dificil, true);
-    $('studyVery').hidden = !item.dificil;
-    updateVeryButton($('studyVery'), item.muitoDificil, true);
-    $('studyAnswerBlock').hidden = !state.studyRevealed;
-    $('studyReveal').textContent = state.studyRevealed ? 'Ocultar resposta' : 'Mostrar resposta';
-    $('studyReveal').setAttribute('aria-expanded', String(state.studyRevealed));
-    $('studyPrevious').disabled = state.studyIndex === 0;
-    $('studyNext').disabled = state.studyIndex === state.studyIds.length - 1;
+    const byId = new Map(state.questions.map(item => [item.id, item]));
+    const questions = state.studyIds.map(id => byId.get(id)).filter(Boolean);
+    $('studyTitle').textContent = state.lists.find(list => list.id === state.currentListId)?.nome || 'Revisão';
+    $('studyCounter').textContent = `${questions.length} pergunta${questions.length === 1 ? '' : 's'} para revisar`;
+    $('studyList').replaceChildren(...questions.map((item, index) => createCard(item, index, true)));
   }
 
   function startStudy() {
     state.studyIds = visibleQuestions().map(item => item.id);
     if (!state.studyIds.length) return;
-    state.studyIndex = 0;
-    state.studyRevealed = false;
+    state.studyRevealedIds = new Set();
     renderStudy();
     $('studyDialog').showModal();
+    $('studyList').scrollTop = 0;
   }
 
   function exportBackup() {
@@ -738,8 +749,6 @@
     for (const [id, filter] of [['filterAll', 'all'], ['filterDifficult', 'difficult'], ['filterVery', 'very']]) {
       $(id).addEventListener('click', () => { state.filter = filter; render(); });
     }
-    $('studyDifficult').addEventListener('click', () => toggleDifficult(state.studyIds[state.studyIndex], true));
-    $('studyVery').addEventListener('click', () => toggleVeryDifficult(state.studyIds[state.studyIndex], true));
     $('batchButton').addEventListener('click', () => { $('batchField').value = ''; updateBatchPreview(); $('batchDialog').showModal(); });
     $('batchField').addEventListener('input', updateBatchPreview);
     $('batchForm').addEventListener('submit', saveBatch);
@@ -749,10 +758,6 @@
       catch (error) { notify('Não foi possível copiar. Tente abrir o site por HTTPS.'); }
     });
     $('studyClose').addEventListener('click', () => $('studyDialog').close());
-    $('studyReveal').addEventListener('click', () => { state.studyRevealed = !state.studyRevealed; renderStudy(); });
-    $('studyPrevious').addEventListener('click', () => { if (state.studyIndex > 0) { state.studyIndex--; state.studyRevealed = false; renderStudy(); } });
-    $('studyNext').addEventListener('click', () => { if (state.studyIndex < state.studyIds.length - 1) { state.studyIndex++; state.studyRevealed = false; renderStudy(); } });
-    $('studyShuffle').addEventListener('click', () => { state.studyIds = shuffle(state.studyIds); state.studyIndex = 0; state.studyRevealed = false; renderStudy(); notify('Revisão embaralhada.'); });
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => $(button.dataset.close).close()));
     $('menuButton').addEventListener('click', () => { $('menu').hidden = !$('menu').hidden; $('menuButton').setAttribute('aria-expanded', String(!$('menu').hidden)); });
     $('signOutButton').addEventListener('click', async () => { closeMenu(); try { await FirebaseCloud.auth.signOut(); } catch (error) { notify('Não foi possível sair da conta.'); } });

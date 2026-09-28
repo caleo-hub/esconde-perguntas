@@ -130,8 +130,16 @@
     </form>
   </dialog>
 
-  <dialog id="studyDialog" class="study-dialog">
-    <div class="study-panel"><div class="study-top"><button id="studyClose" class="icon-button" type="button" aria-label="Fechar revisão">×</button><span>MODO ESTUDO</span><button id="studyShuffle" class="icon-button" type="button" aria-label="Embaralhar revisão" title="Embaralhar">⇄</button></div><div class="study-progress"><span id="studyCounter"></span><div class="progress-track"><div id="progressFill"></div></div></div><div class="study-body"><div class="eyebrow">PERGUNTA</div><h2 id="studyQuestion"></h2><div id="studyAnswerBlock" class="study-answer" hidden><div class="eyebrow">RESPOSTA</div><p id="studyAnswer"></p></div></div><div class="study-actions"><div class="study-difficulty-actions"><button id="studyDifficult" class="difficult-button study-difficult" type="button" aria-pressed="false" aria-label="Marcar como difícil">☆ Marcar difícil</button><button id="studyVery" class="very-button study-very" type="button" aria-pressed="false" aria-label="Marcar como muito difícil" hidden>! Muito difícil</button></div><button id="studyReveal" class="primary-button" type="button">Mostrar resposta</button><div class="study-nav"><button id="studyPrevious" class="secondary-button" type="button">← Anterior</button><button id="studyNext" class="secondary-button" type="button">Próxima →</button></div></div></div>
+  <dialog id="studyDialog" class="study-dialog" aria-labelledby="studyTitle">
+    <div class="study-panel">
+      <header class="study-header">
+        <button id="studyClose" class="back-button study-back" type="button">← Voltar à lista</button>
+        <div class="eyebrow">REVISÃO</div>
+        <h2 id="studyTitle"></h2>
+        <p id="studyCounter"></p>
+      </header>
+      <div id="studyList" class="study-list question-list" aria-label="Perguntas para revisar"></div>
+    </div>
   </dialog>
 
   <dialog id="confirmDialog" class="confirm-dialog"><div class="confirm-panel"><div class="eyebrow">CONFIRMAR AÇÃO</div><h2 id="confirmTitle"></h2><p id="confirmText"></p><div class="confirm-actions"><button id="confirmCancel" class="secondary-button" type="button">Cancelar</button><button id="confirmAccept" class="danger-button" type="button">Apagar</button></div></div></dialog>
