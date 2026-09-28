@@ -13,9 +13,6 @@
   --accent-soft: #a497ff1c;
   --accent-line: #a497ff66;
   --danger: #ff969d;
-  --very: #ffc078;
-  --very-soft: #ffc0781c;
-  --very-line: #ffc07880;
   background: var(--bg);
   color: var(--text);
 }
@@ -108,8 +105,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .difficult-button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--muted); font-size: 25px; cursor: pointer; }
 .difficult-button[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
 .difficult-button:hover { background: var(--accent-soft); }
-.very-button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 1px solid var(--very-line); border-radius: 11px; background: var(--very-soft); color: var(--very); font-size: 22px; font-weight: 850; cursor: pointer; }
-.very-button[aria-pressed="true"] { background: var(--very); color: var(--bg); }
+.very-button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 1px solid var(--accent-line); border-radius: 11px; background: var(--accent-soft); color: var(--accent); font-size: 22px; font-weight: 850; cursor: pointer; }
+.very-button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
 .very-button:hover { filter: brightness(1.13); }
 .study-difficulty-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
 .study-difficult, .study-very { font-size: 14px; font-weight: 750; }
@@ -218,7 +215,7 @@ dialog::backdrop { background: #05070bcc; backdrop-filter: blur(5px); }
 }
 
 @media (prefers-color-scheme: light) {
-  :root { color-scheme: light; --bg: #f7f7fb; --surface: #fff; --surface-2: #f0eff8; --field: #fafafe; --line: #deddea; --text: #1b2030; --muted: #626b7c; --accent: #6553ce; --accent-ink: #fff; --accent-soft: #6553ce0d; --accent-line: #6553ce66; --danger: #b63547; --very: #9b5500; --very-soft: #fff4e8; --very-line: #ce8635; }
+  :root { color-scheme: light; --bg: #f7f7fb; --surface: #fff; --surface-2: #f0eff8; --field: #fafafe; --line: #deddea; --text: #1b2030; --muted: #626b7c; --accent: #6553ce; --accent-ink: #fff; --accent-soft: #6553ce0d; --accent-line: #6553ce66; --danger: #b63547; }
   .hero::after { background: radial-gradient(circle, #897bea22, transparent 69%); }
   .menu { box-shadow: 0 16px 40px #29234a1f; }
   .fab { box-shadow: 0 10px 28px #483a9340; }
