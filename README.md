@@ -20,7 +20,7 @@ Aplicativo de revisão feito apenas com HTML, CSS e JavaScript. Funciona como si
 
 Abra `index.html` no navegador para usar as funções principais. Para testar instalação e funcionamento offline, sirva a pasta por HTTP local, por exemplo com `python -m http.server 8000`, e abra `http://localhost:8000/`.
 
-O arquivo exportado inclui listas e perguntas no formato `{ "version": 2, "listas": [...], "perguntas": [...] }`. A importação acrescenta as perguntas ao conjunto atual. Backups da versão 1 também são aceitos e suas perguntas entram em Geral. Faça backups regularmente.
+O arquivo exportado inclui listas e perguntas no formato `{ "version": 2, "listas": [...], "perguntas": [...] }`. A ordem do array é preservada no navegador e na conta por meio do campo `ordem`. Ao importar, as perguntas do arquivo aparecem na sequência do backup; perguntas com o mesmo ID são atualizadas sem duplicação, e as demais perguntas existentes ficam depois. Backups da versão 1 também são aceitos e suas perguntas entram em Geral. Faça backups regularmente.
 
 Perguntas antigas são migradas automaticamente para Geral. A lista Geral pode ser renomeada, mas não excluída. Ao excluir outra lista, suas perguntas são movidas para a lista Geral, com respostas e estrelas preservadas.
 

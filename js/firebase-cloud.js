@@ -112,7 +112,14 @@
     };
     const publish = () => {
       if (!lists || !questions || initialFailed) return;
-      const data = { lists: mapSnapshot(lists), questions: mapSnapshot(questions) };
+      const data = {
+        lists: mapSnapshot(lists),
+        questions: mapSnapshot(questions).sort((a, b) => {
+          const first = Number.isSafeInteger(a.ordem) && a.ordem >= 0 ? a.ordem : Number.MAX_SAFE_INTEGER;
+          const second = Number.isSafeInteger(b.ordem) && b.ordem >= 0 ? b.ordem : Number.MAX_SAFE_INTEGER;
+          return first - second;
+        })
+      };
       knownLists = new Map(data.lists.map(item => [item.id, item]));
       knownQuestions = new Map(data.questions.map(item => [item.id, item]));
       if (firstSnapshot) {

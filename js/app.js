@@ -18,6 +18,10 @@
     return { id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(), listaId: typeof item.listaId === 'string' ? item.listaId : GENERAL_ID, pergunta: item.pergunta.trim(), resposta: item.resposta.trim(), dificil: item.dificil === true || item.muitoDificil === true, muitoDificil: item.muitoDificil === true, criadaEm: typeof item.criadaEm === 'string' ? item.criadaEm : now, atualizadaEm: typeof item.atualizadaEm === 'string' ? item.atualizadaEm : now };
   }
 
+  function withQuestionOrder(questions) {
+    return questions.map((item, index) => item.ordem === index ? item : { ...item, ordem: index });
+  }
+
   function notify(message) {
     const toast = $('toast');
     toast.textContent = message;
@@ -34,7 +38,7 @@
       const lists = legacy ? [] : stored.listas.filter(item => item && typeof item.id === 'string' && typeof item.nome === 'string' && item.nome.trim()).map(item => ({ id: item.id, nome: item.nome.trim() }));
       state.lists = [{ id: GENERAL_ID, nome: lists.find(item => item.id === GENERAL_ID)?.nome || 'Geral' }, ...lists.filter(item => item.id !== GENERAL_ID)];
       const validIds = new Set(state.lists.map(item => item.id));
-      state.questions = (legacy ? stored : stored.perguntas).filter(validQuestion).map(normalizeQuestion).map(item => validIds.has(item.listaId) ? item : { ...item, listaId: GENERAL_ID });
+      state.questions = withQuestionOrder((legacy ? stored : stored.perguntas).filter(validQuestion).map(normalizeQuestion).map(item => validIds.has(item.listaId) ? item : { ...item, listaId: GENERAL_ID }));
       if (legacy && localStorage.getItem(key) !== null) {
         try { localStorage.setItem(key, JSON.stringify({ version: 2, listas: state.lists, perguntas: state.questions })); }
         catch (error) { notify('Não foi possível atualizar os dados salvos. Exporte um backup antes de fechar o navegador.'); }
@@ -48,11 +52,12 @@
 
   function persist(next, nextLists = state.lists) {
     try {
-      localStorage.setItem(accountStorageKey(), JSON.stringify({ version: 2, listas: nextLists, perguntas: next }));
-      state.questions = next;
+      const ordered = withQuestionOrder(next);
+      localStorage.setItem(accountStorageKey(), JSON.stringify({ version: 2, listas: nextLists, perguntas: ordered }));
+      state.questions = ordered;
       state.lists = nextLists;
       render();
-      if (state.user) FirebaseCloud.saveDelta(nextLists, next).catch(() => notify('Salvo neste aparelho. A sincronização será tentada quando a conexão voltar.'));
+      if (state.user) FirebaseCloud.saveDelta(nextLists, ordered).catch(() => notify('Salvo neste aparelho. A sincronização será tentada quando a conexão voltar.'));
       return true;
     } catch (error) {
       notify('Não foi possível salvar. Verifique o espaço ou as permissões do navegador.');
@@ -530,9 +535,10 @@
       if (data.version === 2) {
         for (const list of data.listas) {
           const name = list.nome.trim();
-          const existing = nextLists.find(item => item.id !== GENERAL_ID && item.nome.toLocaleLowerCase('pt-BR') === name.toLocaleLowerCase('pt-BR'));
+          const existing = nextLists.find(item => item.id === list.id) || nextLists.find(item => item.id !== GENERAL_ID && item.nome.toLocaleLowerCase('pt-BR') === name.toLocaleLowerCase('pt-BR'));
           const id = list.id === GENERAL_ID ? GENERAL_ID : existing?.id || crypto.randomUUID();
           listIds.set(list.id, id);
+          if (id === GENERAL_ID && nextLists[0].nome === 'Geral' && !state.questions.some(item => item.listaId === GENERAL_ID)) nextLists[0] = { id: GENERAL_ID, nome: name };
           if (!nextLists.some(item => item.id === id)) {
             let uniqueName = name;
             let suffix = 1;
@@ -546,13 +552,16 @@
         }
       }
       const existingIds = new Set(state.questions.map(item => item.id));
+      const importedIds = new Set();
       const incoming = data.perguntas.map(normalizeQuestion).map(item => {
         item.listaId = data.version === 2 ? (listIds.get(item.listaId) || GENERAL_ID) : GENERAL_ID;
-        if (existingIds.has(item.id)) item.id = crypto.randomUUID();
-        existingIds.add(item.id);
+        if (importedIds.has(item.id)) item.id = crypto.randomUUID();
+        importedIds.add(item.id);
         return item;
       });
-      if (persist([...incoming, ...state.questions], nextLists)) notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} importada${incoming.length === 1 ? '' : 's'}.`);
+      const updatedCount = incoming.filter(item => existingIds.has(item.id)).length;
+      const remaining = state.questions.filter(item => !importedIds.has(item.id));
+      if (persist([...incoming, ...remaining], nextLists)) notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} organizada${incoming.length === 1 ? '' : 's'} conforme o backup${updatedCount ? ` · ${updatedCount} atualizada${updatedCount === 1 ? '' : 's'}` : ''}.`);
     } catch (error) {
       notify('Arquivo inválido. Selecione um backup JSON do aplicativo.');
     } finally {
@@ -569,6 +578,7 @@
   }
 
   function cacheCurrentAccount() {
+    state.questions = withQuestionOrder(state.questions);
     localStorage.setItem(accountStorageKey(), JSON.stringify({ version: 2, listas: state.lists, perguntas: state.questions }));
   }
 
@@ -626,16 +636,19 @@
           return;
         }
         const useLegacy = hasLegacyData;
+        const localOrder = new Map(localQuestions.map((item, index) => [item.id, index]));
+        const recoverLocalOrder = !useLegacy && remote.questions.length > 0 && remote.questions.every(item => !Number.isSafeInteger(item.ordem) && localOrder.has(item.id));
+        const remoteQuestions = recoverLocalOrder ? [...remote.questions].sort((a, b) => localOrder.get(a.id) - localOrder.get(b.id)) : remote.questions;
         state.lists = mergeById(remote.lists, useLegacy ? localLists : []);
         if (!state.lists.some(list => list.id === GENERAL_ID)) state.lists.unshift({ id: GENERAL_ID, nome: 'Geral' });
-        state.questions = mergeById(remote.questions, useLegacy ? localQuestions : []);
+        state.questions = mergeById(remoteQuestions, useLegacy ? localQuestions : []);
         cacheCurrentAccount();
         render();
         finishLoading();
-        if (useLegacy) {
+        if (useLegacy || recoverLocalOrder) {
           FirebaseCloud.saveAll(state.lists, state.questions).then(() => {
-            localStorage.removeItem(STORAGE_KEY);
-            notify('Suas perguntas deste aparelho foram adicionadas à conta.');
+            if (useLegacy) localStorage.removeItem(STORAGE_KEY);
+            notify(useLegacy ? 'Suas perguntas deste aparelho foram adicionadas à conta.' : 'A ordem das suas perguntas foi sincronizada.');
           }).catch(() => notify('Não foi possível sincronizar os dados locais. Eles continuam salvos neste aparelho.'));
         }
         return;
