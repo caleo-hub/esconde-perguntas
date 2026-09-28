@@ -114,6 +114,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .collection-tools button { min-height: 46px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text); font-size: 14px; font-weight: 700; }
 .collection-tools button:hover { border-color: var(--accent-line); background: var(--accent-soft); }
 .question-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
+#questionList, #studyList { grid-template-columns: minmax(0, 1fr); }
 .collection-filters { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
 .collection-filters::-webkit-scrollbar { display: none; }
 .collection-filters button { display: flex; align-items: center; justify-content: center; gap: 6px; flex: 1 0 auto; min-height: 48px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 750; white-space: nowrap; }

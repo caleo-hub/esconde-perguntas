@@ -1,5 +1,5 @@
-const CACHE_NAME = 'esconde-perguntas-v11';
-const APP_FILES = ['./', './index.html', './css/style.css', './js/app.js', './js/firebase-config.js', './js/firebase-cloud.js', './vendor/firebase/firebase-app-compat.js', './vendor/firebase/firebase-auth-compat.js', './vendor/firebase/firebase-firestore-compat.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE_NAME = 'esconde-perguntas-v12';
+const APP_FILES = ['./', './index.html', './css/style.css?v=12', './js/app.js?v=12', './js/firebase-config.js', './js/firebase-cloud.js', './vendor/firebase/firebase-app-compat.js', './vendor/firebase/firebase-auth-compat.js', './vendor/firebase/firebase-firestore-compat.js', './manifest.json', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_FILES)).then(() => self.skipWaiting()));
