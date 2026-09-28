@@ -13,7 +13,7 @@
 
   function normalizeQuestion(item) {
     const now = new Date().toISOString();
-    return { id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(), listaId: typeof item.listaId === 'string' ? item.listaId : GENERAL_ID, pergunta: item.pergunta.trim(), resposta: item.resposta.trim(), dificil: item.dificil === true, criadaEm: typeof item.criadaEm === 'string' ? item.criadaEm : now, atualizadaEm: typeof item.atualizadaEm === 'string' ? item.atualizadaEm : now };
+    return { id: typeof item.id === 'string' && item.id ? item.id : crypto.randomUUID(), listaId: typeof item.listaId === 'string' ? item.listaId : GENERAL_ID, pergunta: item.pergunta.trim(), resposta: item.resposta.trim(), dificil: item.dificil === true || item.muitoDificil === true, muitoDificil: item.muitoDificil === true, criadaEm: typeof item.criadaEm === 'string' ? item.criadaEm : now, atualizadaEm: typeof item.atualizadaEm === 'string' ? item.atualizadaEm : now };
   }
 
   function notify(message) {
@@ -76,7 +76,7 @@
 
   function visibleQuestions() {
     const query = $('searchInput').value.trim().toLocaleLowerCase('pt-BR');
-    return orderedQuestions().filter(item => item.listaId === state.currentListId && (state.filter === 'all' || item.dificil) && item.pergunta.toLocaleLowerCase('pt-BR').includes(query));
+    return orderedQuestions().filter(item => item.listaId === state.currentListId && (state.filter === 'all' || (state.filter === 'difficult' && item.dificil) || (state.filter === 'very' && item.muitoDificil)) && item.pergunta.toLocaleLowerCase('pt-BR').includes(query));
   }
 
   function updateDifficultButton(button, difficult, withText = false) {
@@ -85,14 +85,50 @@
     button.setAttribute('aria-label', difficult ? 'Desmarcar como difícil' : 'Marcar como difícil');
   }
 
+  function updateVeryButton(button, very, withText = false) {
+    button.textContent = withText ? '! Muito difícil' : '!';
+    button.setAttribute('aria-pressed', String(very));
+    button.setAttribute('aria-label', very ? 'Desmarcar como muito difícil' : 'Marcar como muito difícil');
+    button.title = very ? 'Voltar para difícil' : 'Marcar como muito difícil';
+  }
+
+  function updateRevealAllButton(visible = visibleQuestions()) {
+    const button = $('revealAllButton');
+    button.disabled = !visible.length;
+    button.textContent = visible.length && visible.every(item => state.revealedIds.has(item.id)) ? 'Ocultar todas' : 'Mostrar todas';
+    button.setAttribute('aria-label', `${button.textContent} as respostas dos cartões exibidos`);
+  }
+
+  function toggleRevealAll() {
+    const visible = visibleQuestions();
+    if (!visible.length) return;
+    const hide = visible.every(item => state.revealedIds.has(item.id));
+    for (const item of visible) {
+      if (hide) state.revealedIds.delete(item.id);
+      else state.revealedIds.add(item.id);
+    }
+    render();
+  }
+
   function toggleDifficult(id, fromStudy = false) {
     const item = state.questions.find(question => question.id === id);
     if (!item) return;
-    if (!persist(state.questions.map(question => question.id === id ? { ...question, dificil: !question.dificil, atualizadaEm: new Date().toISOString() } : question))) return;
+    if (!persist(state.questions.map(question => question.id === id ? { ...question, dificil: !question.dificil, muitoDificil: false, atualizadaEm: new Date().toISOString() } : question))) return;
     if (fromStudy) renderStudy();
     else {
       const card = [...$('questionList').children].find(element => element.dataset.id === id);
       (card?.querySelector('.difficult-button') || $('filterDifficult')).focus({ preventScroll: true });
+    }
+  }
+
+  function toggleVeryDifficult(id, fromStudy = false) {
+    const item = state.questions.find(question => question.id === id);
+    if (!item?.dificil) return;
+    if (!persist(state.questions.map(question => question.id === id ? { ...question, muitoDificil: !question.muitoDificil, atualizadaEm: new Date().toISOString() } : question))) return;
+    if (fromStudy) renderStudy();
+    else {
+      const card = [...$('questionList').children].find(element => element.dataset.id === id);
+      (card?.querySelector('.very-button') || $('filterVery')).focus({ preventScroll: true });
     }
   }
 
@@ -125,7 +161,8 @@
       const meta = document.createElement('span');
       meta.className = 'list-card-meta';
       const difficultCount = questions.filter(item => item.dificil).length;
-      meta.textContent = `${questions.length} pergunta${questions.length === 1 ? '' : 's'} · ★ ${difficultCount} ${difficultCount === 1 ? 'difícil' : 'difíceis'}`;
+      const veryCount = questions.filter(item => item.muitoDificil).length;
+      meta.textContent = `${questions.length} pergunta${questions.length === 1 ? '' : 's'} · ★ ${difficultCount} difíceis · ! ${veryCount} muito difíceis`;
       const arrow = document.createElement('span');
       arrow.className = 'list-card-arrow';
       arrow.setAttribute('aria-hidden', 'true');
@@ -147,20 +184,25 @@
     const listQuestions = state.questions.filter(item => item.listaId === state.currentListId);
     const visible = visibleQuestions();
     const difficultCount = listQuestions.filter(item => item.dificil).length;
+    const veryCount = listQuestions.filter(item => item.muitoDificil).length;
     const difficultFilter = state.filter === 'difficult';
+    const veryFilter = state.filter === 'very';
     $('listName').textContent = currentList.nome;
-    $('listSummary').textContent = `${listQuestions.length} pergunta${listQuestions.length === 1 ? '' : 's'} nesta lista · ★ ${difficultCount} ${difficultCount === 1 ? 'difícil' : 'difíceis'}`;
+    $('listSummary').textContent = `${listQuestions.length} pergunta${listQuestions.length === 1 ? '' : 's'} nesta lista · ★ ${difficultCount} difíceis · ! ${veryCount} muito difíceis`;
     $('deleteListButton').hidden = currentList.id === GENERAL_ID;
     $('allCount').textContent = listQuestions.length;
     $('difficultCount').textContent = difficultCount;
-    $('filterAll').setAttribute('aria-pressed', String(!difficultFilter));
+    $('veryCount').textContent = veryCount;
+    $('filterAll').setAttribute('aria-pressed', String(state.filter === 'all'));
     $('filterDifficult').setAttribute('aria-pressed', String(difficultFilter));
+    $('filterVery').setAttribute('aria-pressed', String(veryFilter));
     $('countBadge').textContent = listQuestions.length;
-    $('heroActionIcon').textContent = listQuestions.length || difficultFilter ? '▶' : '＋';
-    $('heroActionText').textContent = difficultFilter ? 'Revisar difíceis' : (listQuestions.length ? 'Começar revisão' : 'Criar pergunta');
-    $('studyButton').disabled = !visible.length && (difficultFilter || listQuestions.length > 0);
+    $('heroActionIcon').textContent = listQuestions.length || state.filter !== 'all' ? '▶' : '＋';
+    $('heroActionText').textContent = veryFilter ? 'Revisar muito difíceis' : difficultFilter ? 'Revisar difíceis' : (listQuestions.length ? 'Começar revisão' : 'Criar pergunta');
+    $('studyButton').disabled = !visible.length && (state.filter !== 'all' || listQuestions.length > 0);
     $('addButton').hidden = listQuestions.length === 0;
     $('shuffleButton').disabled = visible.length < 2;
+    updateRevealAllButton(visible);
     const list = $('questionList');
     list.replaceChildren(...visible.map((item, index) => createCard(item, index)));
     $('emptyState').hidden = visible.length > 0;
@@ -169,6 +211,10 @@
     if (difficultFilter && !difficultCount) {
       $('emptyTitle').textContent = 'Nenhuma pergunta difícil ainda';
       $('emptyText').textContent = 'Marque uma pergunta com a estrela para revisar aqui.';
+    }
+    if (veryFilter && !veryCount) {
+      $('emptyTitle').textContent = 'Nenhuma pergunta muito difícil ainda';
+      $('emptyText').textContent = 'Marque uma pergunta como difícil e toque em ! para revisar aqui.';
     }
   }
 
@@ -194,7 +240,13 @@
     difficult.className = 'difficult-button';
     updateDifficultButton(difficult, item.dificil);
     difficult.addEventListener('click', () => toggleDifficult(item.id));
-    actions.append(difficult, menuButton);
+    const very = document.createElement('button');
+    very.type = 'button';
+    very.className = 'very-button';
+    very.hidden = !item.dificil;
+    updateVeryButton(very, item.muitoDificil);
+    very.addEventListener('click', () => toggleVeryDifficult(item.id));
+    actions.append(difficult, very, menuButton);
     top.append(number, actions);
     const menu = document.createElement('div');
     menu.className = 'card-menu';
@@ -226,7 +278,7 @@
     const reveal = document.createElement('button');
     reveal.className = 'reveal-button'; reveal.type = 'button'; reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta';
     reveal.setAttribute('aria-expanded', String(!answer.hidden));
-    reveal.addEventListener('click', () => { answer.hidden = !answer.hidden; if (answer.hidden) state.revealedIds.delete(item.id); else state.revealedIds.add(item.id); reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta'; reveal.setAttribute('aria-expanded', String(!answer.hidden)); });
+    reveal.addEventListener('click', () => { answer.hidden = !answer.hidden; if (answer.hidden) state.revealedIds.delete(item.id); else state.revealedIds.add(item.id); reveal.textContent = answer.hidden ? 'Mostrar resposta' : 'Ocultar resposta'; reveal.setAttribute('aria-expanded', String(!answer.hidden)); updateRevealAllButton(); });
     card.append(top, menu, title, answer, reveal);
     return card;
   }
@@ -255,7 +307,7 @@
     const id = $('questionId').value;
     const now = new Date().toISOString();
     const existing = state.questions.find(item => item.id === id);
-    const updated = existing ? state.questions.map(item => item.id === id ? { ...item, pergunta, resposta, atualizadaEm: now } : item) : [{ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, criadaEm: now, atualizadaEm: now }, ...state.questions];
+    const updated = existing ? state.questions.map(item => item.id === id ? { ...item, pergunta, resposta, atualizadaEm: now } : item) : [{ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, muitoDificil: false, criadaEm: now, atualizadaEm: now }, ...state.questions];
     if (persist(updated)) { $('formDialog').close(); notify(existing ? 'Pergunta atualizada.' : 'Pergunta adicionada.'); }
   }
 
@@ -382,7 +434,7 @@
       return;
     }
     const now = new Date().toISOString();
-    const incoming = pairs.map(({ pergunta, resposta }) => ({ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, criadaEm: now, atualizadaEm: now }));
+    const incoming = pairs.map(({ pergunta, resposta }) => ({ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, muitoDificil: false, criadaEm: now, atualizadaEm: now }));
     if (persist([...incoming, ...state.questions])) {
       $('batchDialog').close();
       notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} adicionada${incoming.length === 1 ? '' : 's'}.`);
@@ -414,6 +466,8 @@
     $('studyQuestion').textContent = item.pergunta;
     $('studyAnswer').textContent = item.resposta;
     updateDifficultButton($('studyDifficult'), item.dificil, true);
+    $('studyVery').hidden = !item.dificil;
+    updateVeryButton($('studyVery'), item.muitoDificil, true);
     $('studyAnswerBlock').hidden = !state.studyRevealed;
     $('studyReveal').textContent = state.studyRevealed ? 'Ocultar resposta' : 'Mostrar resposta';
     $('studyReveal').setAttribute('aria-expanded', String(state.studyRevealed));
@@ -499,6 +553,7 @@
     $('addButton').addEventListener('click', () => openForm());
     $('questionForm').addEventListener('submit', saveForm);
     $('searchInput').addEventListener('input', render);
+    $('revealAllButton').addEventListener('click', toggleRevealAll);
     $('shuffleButton').addEventListener('click', () => {
       state.shuffled = !state.shuffled;
       state.displayIds = state.shuffled ? shuffle(visibleQuestions().map(item => item.id)) : [];
@@ -506,10 +561,11 @@
       render();
     });
     $('studyButton').addEventListener('click', () => state.questions.some(item => item.listaId === state.currentListId) ? startStudy() : openForm());
-    for (const [id, filter] of [['filterAll', 'all'], ['filterDifficult', 'difficult']]) {
+    for (const [id, filter] of [['filterAll', 'all'], ['filterDifficult', 'difficult'], ['filterVery', 'very']]) {
       $(id).addEventListener('click', () => { state.filter = filter; render(); });
     }
     $('studyDifficult').addEventListener('click', () => toggleDifficult(state.studyIds[state.studyIndex], true));
+    $('studyVery').addEventListener('click', () => toggleVeryDifficult(state.studyIds[state.studyIndex], true));
     $('batchButton').addEventListener('click', () => { $('batchField').value = ''; updateBatchPreview(); $('batchDialog').showModal(); });
     $('batchField').addEventListener('input', updateBatchPreview);
     $('batchForm').addEventListener('submit', saveBatch);

@@ -13,6 +13,9 @@
   --accent-soft: #a497ff1c;
   --accent-line: #a497ff66;
   --danger: #ff969d;
+  --very: #ffc078;
+  --very-soft: #ffc0781c;
+  --very-line: #ffc07880;
   background: var(--bg);
   color: var(--text);
 }
@@ -92,16 +95,24 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .search-box span:first-child { font-size: 25px; line-height: 1; }
 .search-box input { width: 100%; height: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: 16px; }
 .search-box input::placeholder { color: var(--muted); opacity: .85; }
+.collection-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: -2px 0 15px; }
+.collection-tools button { min-height: 46px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text); font-size: 14px; font-weight: 700; }
+.collection-tools button:hover { border-color: var(--accent-line); background: var(--accent-soft); }
 .question-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
-.collection-filters { display: flex; gap: 8px; margin-bottom: 14px; }
-.collection-filters button { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; min-height: 46px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); font-size: 14px; font-weight: 750; }
+.collection-filters { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
+.collection-filters::-webkit-scrollbar { display: none; }
+.collection-filters button { display: flex; align-items: center; justify-content: center; gap: 6px; flex: 1 0 auto; min-height: 48px; padding: 0 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--muted); font-size: 13px; font-weight: 750; white-space: nowrap; }
 .collection-filters button[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
 .collection-filters span { min-width: 22px; padding: 2px 5px; border-radius: 6px; background: var(--surface-2); font-size: 12px; }
 .card-actions { display: flex; gap: 4px; }
 .difficult-button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 1px solid transparent; border-radius: 11px; background: transparent; color: var(--muted); font-size: 25px; cursor: pointer; }
 .difficult-button[aria-pressed="true"] { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent); }
 .difficult-button:hover { background: var(--accent-soft); }
-.study-difficult { display: block; margin: 0 auto 10px; font-size: 14px; font-weight: 750; }
+.very-button { min-width: 44px; min-height: 44px; padding: 0 10px; border: 1px solid var(--very-line); border-radius: 11px; background: var(--very-soft); color: var(--very); font-size: 22px; font-weight: 850; cursor: pointer; }
+.very-button[aria-pressed="true"] { background: var(--very); color: var(--bg); }
+.very-button:hover { filter: brightness(1.13); }
+.study-difficulty-actions { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.study-difficult, .study-very { font-size: 14px; font-weight: 750; }
 .question-card { min-width: 0; padding: 18px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); }
 .card-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .card-number { color: var(--accent); font-size: 11px; font-weight: 800; letter-spacing: .13em; }
@@ -207,7 +218,7 @@ dialog::backdrop { background: #05070bcc; backdrop-filter: blur(5px); }
 }
 
 @media (prefers-color-scheme: light) {
-  :root { color-scheme: light; --bg: #f7f7fb; --surface: #fff; --surface-2: #f0eff8; --field: #fafafe; --line: #deddea; --text: #1b2030; --muted: #626b7c; --accent: #6553ce; --accent-ink: #fff; --accent-soft: #6553ce0d; --accent-line: #6553ce66; --danger: #b63547; }
+  :root { color-scheme: light; --bg: #f7f7fb; --surface: #fff; --surface-2: #f0eff8; --field: #fafafe; --line: #deddea; --text: #1b2030; --muted: #626b7c; --accent: #6553ce; --accent-ink: #fff; --accent-soft: #6553ce0d; --accent-line: #6553ce66; --danger: #b63547; --very: #9b5500; --very-soft: #fff4e8; --very-line: #ce8635; }
   .hero::after { background: radial-gradient(circle, #897bea22, transparent 69%); }
   .menu { box-shadow: 0 16px 40px #29234a1f; }
   .fab { box-shadow: 0 10px 28px #483a9340; }
