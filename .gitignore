@@ -1,0 +1,21 @@
+# Local tooling and build output
+node_modules/
+dist/
+coverage/
+.firebase/
+.cache/
+
+# Local environment and Firebase CLI logs
+.env
+.env.*
+!.env.example
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
