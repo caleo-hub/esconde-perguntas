@@ -1,0 +1,12 @@
+{
+  "name": "esconde-perguntas",
+  "private": true,
+  "scripts": {
+    "test:rules": "firebase emulators:exec --only auth,firestore --project demo-esconde-perguntas \"node --test tests/firestore.rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase": "^12.19.0",
+    "firebase-tools": "^15.32.0"
+  }
+}

@@ -5,5 +5,6 @@ window.FIREBASE_CONFIG = {
   projectId: 'esconde-perguntas',
   storageBucket: 'esconde-perguntas.firebasestorage.app',
   messagingSenderId: '666924276241',
-  appId: '1:666924276241:web:52d0721f6eb51a76af6fb0'
+  appId: '1:666924276241:web:52d0721f6eb51a76af6fb0',
+  appCheckSiteKey: ''
 };

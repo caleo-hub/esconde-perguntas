@@ -12,6 +12,8 @@ Aplicativo de revisão feito apenas com HTML, CSS e JavaScript. Funciona como si
 - Revisar as perguntas em uma lista com rolagem e revelar cada resposta no próprio cartão, em ordem normal ou aleatória.
 - Embaralhar as perguntas e voltar à ordem normal com o mesmo botão. Os cartões ficam sempre em uma coluna, inclusive em tablets e computadores.
 - Entrar ou criar uma conta com e-mail e senha; listas e perguntas são sincronizadas no Firestore e isoladas por conta.
+- Explorar listas públicas aprovadas pela comunidade, copiar uma lista para a própria conta ou enviar uma lista à equipe para aprovação.
+- Denunciar conteúdo e revisar envios em uma área de moderação separada, acessível somente a contas verificadas cadastradas pelo responsável do Firebase.
 - Guardar uma cópia local para continuar usando as perguntas neste navegador.
 - Exportar e importar perguntas em arquivo JSON.
 - Abrir sem internet após o primeiro carregamento, por meio de Service Worker.
@@ -35,3 +37,28 @@ O projeto usa caminhos relativos e pode ser publicado a partir da raiz da branch
 ## Firebase
 
 O app usa Firebase Authentication com e-mail e senha e grava cada conta em `users/{uid}/listas` e `users/{uid}/perguntas`. A configuração Web em `js/firebase-config.js` é pública; as regras publicadas em `firestore.rules` limitam cada usuário aos próprios documentos. Os arquivos compat do SDK ficam em `vendor/firebase/` para manter o shell do app disponível offline. O provedor E-mail/senha e o domínio `caleo-hub.github.io` estão habilitados no Firebase Authentication. O banco atual está na região `nam5`.
+
+## Catálogo de listas
+
+O catálogo é público para leitura, mas só inclui documentos aprovados em `marketplaceLists`. Os documentos pessoais em `users/{uid}` continuam privados. Uma publicação guarda os metadados no documento principal e as perguntas em `content/main`; as estrelas pessoais não são publicadas. Publicações e envios são snapshots: alterações do autor só chegam ao catálogo depois de nova aprovação, e cópias existentes não são alteradas.
+
+Cada conta verificada pode manter até três envios pendentes. Um slot decidido ou cancelado pode ser reutilizado após 24 horas. Cada envio aceita de 1 a 200 perguntas, pergunta de até 1.000 caracteres, resposta de até 4.000 caracteres e conteúdo serializado de até 750 KiB. O campo de perguntas não é indexado. O catálogo pagina em lotes de 12 e permite buscar pelo início do título.
+
+### Preparar a equipe de moderação
+
+1. Na página Authentication do Firebase, obtenha o UID de cada pessoa que deve moderar e confirme que a conta foi verificada por e-mail.
+2. No Firestore Console, crie `marketplaceModerators/{UID}` com `ativo: true`. Somente o responsável pelo projeto deve criar ou revogar esses documentos; nenhuma tela do app concede esse papel.
+3. A pessoa moderadora entra no app com a conta verificada e abre **Moderação** no menu. A fila mostra envios e denúncias; a aprovação publica o snapshot, a rejeição registra um motivo e denúncias podem ser resolvidas ou causar ocultação.
+4. Para revogar acesso, apague o documento ou defina `ativo: false`. As regras negam novas ações administrativas.
+
+### App Check e publicação
+
+O site usa App Check com reCAPTCHA Enterprise. Crie uma chave do tipo Web no Google Cloud, limitando-a ao domínio `caleo-hub.github.io`; registre o app em Firebase Console > Segurança > App Check. Copie a chave pública do site para `appCheckSiteKey` em `js/firebase-config.js`. É uma chave pública do reCAPTCHA, não uma credencial administrativa. Primeiro verifique as métricas de solicitações e então ative a exigência para o Firestore. Não inclua credenciais de service account no repositório.
+
+Publique índices e regras antes do site com `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project esconde-perguntas`. Depois publique a branch `main` no GitHub Pages e confirme que o Service Worker atualizou. O catálogo, denúncias, cópia e moderação exigem conexão; as listas pessoais continuam disponíveis offline.
+
+O projeto permanece no plano gratuito Spark. Acompanhe o uso na aba Usage do Firestore: cotas diárias de leitura e gravação podem tornar o catálogo temporariamente indisponível se forem atingidas. O App Check reduz abuso de clientes não genuínos, mas não substitui as regras nem impede todo abuso com múltiplas contas.
+
+### Futuras vendas
+
+As listas publicadas nesta versão permanecem gratuitas e copiáveis. Não converta uma publicação gratuita em paga. Uma futura versão comercial exigirá backend para verificar pagamentos e autorizações antes de entregar conteúdo protegido; nenhum checkout, preço, pagamento ou repasse faz parte desta fase.

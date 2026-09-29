@@ -4,7 +4,7 @@
   const STORAGE_KEY = 'escondePerguntas';
   const GENERAL_ID = 'geral';
   const $ = id => document.getElementById(id);
-  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyRevealedIds: new Set(), installPrompt: null, user: null, storageKey: STORAGE_KEY, authMode: 'login', importLegacyOnLogin: false };
+  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyRevealedIds: new Set(), installPrompt: null, user: null, storageKey: STORAGE_KEY, authMode: 'login', importLegacyOnLogin: false, page: 'catalog', pendingAuthAction: null };
   let toastTimer;
 
   function accountStorageKey() { return state.user ? `${STORAGE_KEY}:${state.user.uid}` : STORAGE_KEY; }
@@ -35,7 +35,7 @@
       const stored = JSON.parse(localStorage.getItem(key) || '[]');
       const legacy = Array.isArray(stored);
       if (!legacy && (!stored || stored.version !== 2 || !Array.isArray(stored.listas) || !Array.isArray(stored.perguntas))) throw new Error('Formato inválido');
-      const lists = legacy ? [] : stored.listas.filter(item => item && typeof item.id === 'string' && typeof item.nome === 'string' && item.nome.trim()).map(item => ({ id: item.id, nome: item.nome.trim() }));
+      const lists = legacy ? [] : stored.listas.filter(item => item && typeof item.id === 'string' && typeof item.nome === 'string' && item.nome.trim()).map(item => ({ id: item.id, nome: item.nome.trim(), ...(typeof item.origemPublicacaoId === 'string' ? { origemPublicacaoId: item.origemPublicacaoId } : {}), ...(typeof item.origemAutorApelido === 'string' ? { origemAutorApelido: item.origemAutorApelido } : {}), ...(Number.isSafeInteger(item.origemVersao) ? { origemVersao: item.origemVersao } : {}) }));
       state.lists = [{ id: GENERAL_ID, nome: lists.find(item => item.id === GENERAL_ID)?.nome || 'Geral' }, ...lists.filter(item => item.id !== GENERAL_ID)];
       const validIds = new Set(state.lists.map(item => item.id));
       state.questions = withQuestionOrder((legacy ? stored : stored.perguntas).filter(validQuestion).map(normalizeQuestion).map(item => validIds.has(item.listaId) ? item : { ...item, listaId: GENERAL_ID }));
@@ -50,14 +50,14 @@
     }
   }
 
-  function persist(next, nextLists = state.lists) {
+  function persist(next, nextLists = state.lists, sync = true) {
     try {
       const ordered = withQuestionOrder(next);
       localStorage.setItem(accountStorageKey(), JSON.stringify({ version: 2, listas: nextLists, perguntas: ordered }));
       state.questions = ordered;
       state.lists = nextLists;
       render();
-      if (state.user) FirebaseCloud.saveDelta(nextLists, ordered).catch(() => notify('Salvo neste aparelho. A sincronização será tentada quando a conexão voltar.'));
+      if (state.user && sync) FirebaseCloud.saveDelta(nextLists, ordered).catch(() => notify('Salvo neste aparelho. A sincronização será tentada quando a conexão voltar.'));
       return true;
     } catch (error) {
       notify('Não foi possível salvar. Verifique o espaço ou as permissões do navegador.');
@@ -160,6 +160,7 @@
   function openList(id) {
     if (!state.lists.some(list => list.id === id)) return;
     state.currentListId = id;
+    state.page = 'home';
     state.filter = 'all';
     state.shuffled = false;
     state.displayIds = [];
@@ -200,10 +201,27 @@
 
   function render() {
     if (state.currentListId && !state.lists.some(list => list.id === state.currentListId)) state.currentListId = null;
-    $('homeView').hidden = state.currentListId !== null;
-    $('listView').hidden = state.currentListId === null;
+    const privatePage = state.page === 'home';
+    $('homeView').hidden = !privatePage || state.currentListId !== null;
+    $('listView').hidden = !privatePage || state.currentListId === null;
+    $('catalogView').hidden = state.page !== 'catalog';
+    $('catalogDetailView').hidden = state.page !== 'catalogDetail';
+    $('myPublicationsView').hidden = state.page !== 'myPublications';
+    $('moderationView').hidden = state.page !== 'moderation';
+    $('mainNavigation').hidden = !['home', 'catalog'].includes(state.page);
+    $('navMyLists').setAttribute('aria-pressed', String(privatePage));
+    $('navExplore').setAttribute('aria-pressed', String(state.page === 'catalog'));
+    $('accountButton').hidden = Boolean(state.user);
+    $('menuButton').hidden = !state.user;
+    $('importButton').hidden = !state.user;
+    $('exportButton').hidden = !state.user;
+    $('signOutButton').hidden = !state.user;
+    $('deleteAllButton').hidden = !state.user;
+    $('myPublicationsButton').hidden = !state.user;
+    $('publishListButton').hidden = !state.user;
+    $('addButton').hidden = !state.user || !privatePage || !state.currentListId;
     renderHome();
-    if (!state.currentListId) { $('addButton').hidden = true; return; }
+    if (!privatePage || !state.currentListId) return;
     const currentList = state.lists.find(list => list.id === state.currentListId);
     const listQuestions = state.questions.filter(item => item.listaId === state.currentListId);
     const visible = visibleQuestions();
@@ -240,6 +258,28 @@
       $('emptyTitle').textContent = 'Nenhuma pergunta muito difícil ainda';
       $('emptyText').textContent = 'Marque uma pergunta como difícil e toque em ! para revisar aqui.';
     }
+  }
+
+  function showAuthPage(action = null) {
+    state.pendingAuthAction = action;
+    $('appShell').hidden = true;
+    $('authView').hidden = false;
+    setAuthMode('login');
+  }
+
+  function requireAccount(action) {
+    if (state.user) { action?.(); return true; }
+    showAuthPage(action);
+    return false;
+  }
+
+  function showPage(page) {
+    state.page = page;
+    render();
+    window.scrollTo(0, 0);
+    if (page === 'catalog') Marketplace.showCatalog(true);
+    if (page === 'myPublications') Marketplace.showMyPublications();
+    if (page === 'moderation') Marketplace.showModeration();
   }
 
   function createCard(item, index, inStudy = false) {
@@ -547,7 +587,7 @@
               uniqueName = `${name.slice(0, 60 - ending.length)}${ending}`;
               suffix++;
             }
-            nextLists.push({ id, nome: uniqueName });
+            nextLists.push({ id, nome: uniqueName, ...(typeof list.origemPublicacaoId === 'string' ? { origemPublicacaoId: list.origemPublicacaoId } : {}), ...(typeof list.origemAutorApelido === 'string' ? { origemAutorApelido: list.origemAutorApelido } : {}), ...(Number.isSafeInteger(list.origemVersao) ? { origemVersao: list.origemVersao } : {}) });
           }
         }
       }
@@ -602,6 +642,7 @@
     const localQuestions = [...state.questions];
     const localLists = [...state.lists];
     state.currentListId = null;
+    state.page = 'home';
     $('authView').hidden = false;
     $('appShell').hidden = true;
     $('authTitle').textContent = 'Carregando seus estudos';
@@ -609,7 +650,18 @@
     $('authForm').hidden = true;
     $('authModeButton').hidden = true;
     $('resetPasswordButton').hidden = true;
-    const finishLoading = () => { $('authView').hidden = true; $('appShell').hidden = false; };
+    const finishLoading = () => {
+      $('authView').hidden = true;
+      $('appShell').hidden = false;
+      Marketplace.updateAccountUI();
+      const pending = state.pendingAuthAction;
+      state.pendingAuthAction = null;
+      if (pending) pending();
+      else {
+        const publicationId = new URLSearchParams(location.search).get('catalogo');
+        if (publicationId) Marketplace.openPublication(publicationId);
+      }
+    };
     FirebaseCloud.watch(user.uid, (remote, initial, error) => {
       if (initial) {
         if (error) {
@@ -720,6 +772,7 @@
         if (password !== $('authPasswordConfirm').value) throw Object.assign(new Error('Senhas diferentes'), { code: 'auth/password-mismatch' });
         state.importLegacyOnLogin = !$('legacyImportGroup').hidden && $('importLegacyQuestions').checked;
         await FirebaseCloud.createAccount(email, password);
+        try { await FirebaseCloud.sendVerificationEmail(); notify('Enviamos um link para confirmar seu e-mail.'); } catch (error) {}
       } else await FirebaseCloud.signIn(email, password);
     } catch (error) { state.importLegacyOnLogin = false; showAuthError(error); }
   }
@@ -735,6 +788,8 @@
     $('authForm').addEventListener('submit', submitAuth);
     $('authModeButton').addEventListener('click', () => setAuthMode(state.authMode === 'login' ? 'register' : 'login'));
     $('resetPasswordButton').addEventListener('click', resetPassword);
+    $('accountButton').addEventListener('click', () => showAuthPage());
+    $('guestBrowseButton').addEventListener('click', () => { state.pendingAuthAction = null; $('authView').hidden = true; $('appShell').hidden = false; showPage('catalog'); });
     FirebaseCloud.auth.onAuthStateChanged(user => {
       if (user) activateAccount(user);
       else {
@@ -743,11 +798,33 @@
         state.questions = [];
         state.lists = [{ id: GENERAL_ID, nome: 'Geral' }];
         state.currentListId = null;
-        $('appShell').hidden = true;
-        $('authView').hidden = false;
-        setAuthMode('login');
+        state.page = 'catalog';
+        $('appShell').hidden = false;
+        $('authView').hidden = true;
+        Marketplace.updateAccountUI();
+        render();
+        const publicationId = new URLSearchParams(location.search).get('catalogo');
+        if (publicationId) Marketplace.openPublication(publicationId);
+        else Marketplace.showCatalog(true);
       }
     }, error => showAuthError(error));
+    $('navMyLists').addEventListener('click', () => requireAccount(() => showPage('home')));
+    $('navExplore').addEventListener('click', () => showPage('catalog'));
+    $('catalogSearch').addEventListener('input', () => Marketplace.searchChanged());
+    $('catalogMore').addEventListener('click', () => Marketplace.showCatalog(false));
+    $('catalogBack').addEventListener('click', () => { history.replaceState(null, '', location.pathname); showPage('catalog'); });
+    $('copyPublicationButton').addEventListener('click', () => requireAccount(() => Marketplace.copyPublication()));
+    $('sharePublicationButton').addEventListener('click', () => Marketplace.sharePublication());
+    $('reportPublicationButton').addEventListener('click', () => requireAccount(() => Marketplace.openReport()));
+    $('publishListButton').addEventListener('click', () => requireAccount(() => Marketplace.openPublishForm()));
+    $('publishForm').addEventListener('submit', event => Marketplace.submitPublication(event));
+    $('reportForm').addEventListener('submit', event => Marketplace.submitReport(event));
+    $('publishVerifyButton').addEventListener('click', () => Marketplace.sendVerification());
+    $('reportVerifyButton').addEventListener('click', () => Marketplace.sendVerification());
+    $('myPublicationsButton').addEventListener('click', () => { closeMenu(); showPage('myPublications'); });
+    $('moderationButton').addEventListener('click', () => { closeMenu(); showPage('moderation'); });
+    $('myPublicationsBack').addEventListener('click', () => showPage('home'));
+    $('moderationBack').addEventListener('click', () => showPage('home'));
     $('newListButton').addEventListener('click', () => openListForm());
     $('listForm').addEventListener('submit', saveListForm);
     $('backButton').addEventListener('click', () => { state.currentListId = null; render(); window.scrollTo(0, 0); });
@@ -794,6 +871,18 @@
     window.addEventListener('appinstalled', () => { state.installPrompt = null; $('installButton').hidden = true; });
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   }
+
+  window.App = {
+    getState: () => state,
+    notify,
+    render,
+    persist,
+    showPage,
+    requireAccount,
+    showAuthPage,
+    openList,
+    refreshAccount: async () => { await FirebaseCloud.auth.currentUser?.reload(); state.user = FirebaseCloud.auth.currentUser; render(); }
+  };
 
   setup();
 })();
