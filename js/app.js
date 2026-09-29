@@ -213,6 +213,7 @@
     $('navExplore').setAttribute('aria-pressed', String(state.page === 'catalog'));
     $('accountButton').hidden = Boolean(state.user);
     $('menuButton').hidden = !state.user;
+    $('verifyEmailButton').hidden = !state.user || state.user.emailVerified;
     $('importButton').hidden = !state.user;
     $('exportButton').hidden = !state.user;
     $('signOutButton').hidden = !state.user;
@@ -772,7 +773,7 @@
         if (password !== $('authPasswordConfirm').value) throw Object.assign(new Error('Senhas diferentes'), { code: 'auth/password-mismatch' });
         state.importLegacyOnLogin = !$('legacyImportGroup').hidden && $('importLegacyQuestions').checked;
         await FirebaseCloud.createAccount(email, password);
-        try { await FirebaseCloud.sendVerificationEmail(); notify('Enviamos um link para confirmar seu e-mail.'); } catch (error) {}
+        await sendVerificationEmail();
       } else await FirebaseCloud.signIn(email, password);
     } catch (error) { state.importLegacyOnLogin = false; showAuthError(error); }
   }
@@ -782,6 +783,25 @@
     if (!email) { $('authError').textContent = 'Digite seu e-mail para receber o link de redefinição.'; $('authError').hidden = false; $('authEmail').focus(); return; }
     try { await FirebaseCloud.resetPassword(email); notify('Enviamos um link para redefinir sua senha.'); }
     catch (error) { showAuthError(error); }
+  }
+
+  async function sendVerificationEmail() {
+    const user = FirebaseCloud.auth.currentUser;
+    if (!user) { notify('Entre na sua conta para enviar a confirmação.'); return; }
+    if (user.emailVerified) { notify('Este e-mail já está confirmado.'); return; }
+    try {
+      await FirebaseCloud.sendVerificationEmail();
+      notify(`Enviamos o link de confirmação para ${user.email}. Confira também a caixa de spam.`);
+    } catch (error) {
+      const messages = {
+        'auth/too-many-requests': 'O Firebase limitou temporariamente os envios. Aguarde e tente novamente.',
+        'auth/network-request-failed': 'Sem conexão. Conecte-se à internet e tente reenviar.',
+        'auth/user-token-expired': 'Sua sessão expirou. Entre novamente e peça outro link.',
+        'auth/unauthorized-continue-uri': 'O domínio do link não está autorizado no Firebase Authentication.',
+        'auth/operation-not-allowed': 'O envio de e-mails de confirmação não está habilitado no Firebase Authentication.'
+      };
+      notify(messages[error?.code] || `O Firebase não enviou o link${error?.code ? ` (${error.code})` : ''}. Tente novamente mais tarde.`);
+    }
   }
 
   function setup() {
@@ -858,6 +878,7 @@
     document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => $(button.dataset.close).close()));
     $('menuButton').addEventListener('click', () => { $('menu').hidden = !$('menu').hidden; $('menuButton').setAttribute('aria-expanded', String(!$('menu').hidden)); });
     $('signOutButton').addEventListener('click', async () => { closeMenu(); try { await FirebaseCloud.auth.signOut(); } catch (error) { notify('Não foi possível sair da conta.'); } });
+    $('verifyEmailButton').addEventListener('click', () => { closeMenu(); sendVerificationEmail(); });
     document.addEventListener('click', event => { if (!$('menu').contains(event.target) && !$('menuButton').contains(event.target)) closeMenu(); });
     document.addEventListener('click', event => { if (!$('listOptions').contains(event.target) && !$('listOptionsButton').contains(event.target)) { $('listOptions').hidden = true; $('listOptionsButton').setAttribute('aria-expanded', 'false'); } });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMenu(); });
@@ -881,7 +902,8 @@
     requireAccount,
     showAuthPage,
     openList,
-    refreshAccount: async () => { await FirebaseCloud.auth.currentUser?.reload(); state.user = FirebaseCloud.auth.currentUser; render(); }
+    refreshAccount: async () => { await FirebaseCloud.auth.currentUser?.reload(); state.user = FirebaseCloud.auth.currentUser; render(); },
+    sendVerificationEmail
   };
 
   setup();

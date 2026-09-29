@@ -21,6 +21,7 @@
     const user = app?.getState().user;
     $('accountButton').textContent = user ? '' : 'Entrar';
     $('accountButton').hidden = Boolean(user);
+    $('verifyEmailButton').hidden = !user || user.emailVerified;
     $('menuButton').hidden = !user;
     $('navMyLists').hidden = !user;
     $('importButton').hidden = !user;
@@ -412,8 +413,7 @@
   }
 
   async function sendVerification() {
-    try { await FirebaseCloud.sendVerificationEmail(); App.notify('Enviamos um link de confirmação para seu e-mail.'); }
-    catch (error) { App.notify('Não foi possível enviar o link. Tente novamente mais tarde.'); }
+    await App.sendVerificationEmail();
   }
 
   window.Marketplace = {
