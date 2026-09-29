@@ -42,7 +42,7 @@ O app usa Firebase Authentication com e-mail e senha e grava cada conta em `user
 
 O catálogo é público para leitura, mas só inclui documentos aprovados em `marketplaceLists`. Os documentos pessoais em `users/{uid}` continuam privados. Uma publicação guarda os metadados no documento principal e as perguntas em `content/main`; as estrelas pessoais não são publicadas. Publicações e envios são snapshots: alterações do autor só chegam ao catálogo depois de nova aprovação, e cópias existentes não são alteradas.
 
-Cada conta verificada pode manter até três envios pendentes. Um slot decidido ou cancelado pode ser reutilizado após 24 horas. Cada envio aceita de 1 a 200 perguntas, pergunta de até 1.000 caracteres, resposta de até 4.000 caracteres e conteúdo serializado de até 750 KiB. O campo de perguntas não é indexado. O catálogo pagina em lotes de 12 e permite buscar pelo início do título.
+Cada conta verificada pode manter até três envios pendentes. Um slot decidido ou cancelado pode ser reutilizado após 24 horas. Cada envio aceita de 1 a 200 perguntas, pergunta de até 1.000 caracteres, resposta de até 4.000 caracteres e conteúdo serializado de até 750 KiB. O app não consulta o conteúdo das perguntas no Firestore. As isenções para os campos grandes estão declaradas em `firestore.indexes.json`, mas a gravação delas pelo Console falhou e ainda precisa ser aplicada via Firebase CLI. O catálogo pagina em lotes de 12 e permite buscar pelo início do título.
 
 ### Preparar a equipe de moderação
 
