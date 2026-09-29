@@ -80,6 +80,9 @@ test('exige e-mail verificado para enviar e denunciar', async () => {
 
 test('aceita envio verificado no slot próprio e impede forjar autor ou usar slot 4', async () => {
   const db = env.authenticatedContext('owner', { email_verified: true }).firestore();
+  await assertSucceeds(getDoc(doc(db, 'marketplaceSubmissions/owner_1')));
+  await assertSucceeds(getDoc(doc(db, 'marketplaceSubmissions/owner_2')));
+  await assertFails(getDoc(doc(db, 'marketplaceSubmissions/other_1')));
   await assertSucceeds(setDoc(doc(db, 'marketplaceSubmissions/owner_1'), submission('owner', 1)));
   await assertFails(setDoc(doc(db, 'marketplaceSubmissions/owner_2'), submission('someone-else', 2)));
   await assertFails(setDoc(doc(db, 'marketplaceSubmissions/owner_4'), submission('owner', 4)));

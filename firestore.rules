@@ -80,7 +80,12 @@ service cloud.firestore {
     }
 
     match /marketplaceSubmissions/{submissionId} {
-      allow get: if moderator() || (signedIn() && resource.data.ownerUid == request.auth.uid);
+      // Clients check their three fixed slots before submitting; allow those reads even when a slot is empty.
+      allow get: if moderator() || (signedIn() && (
+        submissionId == request.auth.uid + '_1'
+        || submissionId == request.auth.uid + '_2'
+        || submissionId == request.auth.uid + '_3'
+      ));
       allow list: if moderator() && request.query.limit <= 25;
       allow create: if verified()
         && notBlocked()
