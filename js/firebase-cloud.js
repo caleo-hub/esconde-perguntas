@@ -28,7 +28,7 @@
   const submissions = db.collection('marketplaceSubmissions');
   const reports = db.collection('marketplaceReports');
   const moderators = db.collection('marketplaceModerators');
-  const selfApprovalUid = 'teWRzOUt6V1reZ7dklZcCe9S2D2';
+  const selfApprovalUid = 'teWRzOUt6lV1reZ7dklZcCe9S2D2';
   const blocks = db.collection('marketplaceBlocks');
   const serverTime = () => firebase.firestore.FieldValue.serverTimestamp();
   const asItem = document => ({ id: document.id, ...document.data() });

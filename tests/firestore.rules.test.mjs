@@ -4,7 +4,7 @@ import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebas
 import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 
 const projectId = 'demo-esconde-perguntas';
-const selfApproverUid = 'teWRzOUt6V1reZ7dklZcCe9S2D2';
+const selfApproverUid = 'teWRzOUt6lV1reZ7dklZcCe9S2D2';
 let env;
 
 function publicMetadata(id, ownerUid = 'owner') {

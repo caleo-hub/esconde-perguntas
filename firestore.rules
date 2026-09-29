@@ -17,7 +17,7 @@ service cloud.firestore {
     }
 
     function ownApprovalSubmission(data, publicationId) {
-      return request.auth.uid == 'teWRzOUt6V1reZ7dklZcCe9S2D2'
+      return request.auth.uid == 'teWRzOUt6lV1reZ7dklZcCe9S2D2'
         && moderator()
         && data.ownerUid == request.auth.uid
         && data.approvalSubmissionId in [request.auth.uid + '_1', request.auth.uid + '_2', request.auth.uid + '_3']
@@ -32,7 +32,7 @@ service cloud.firestore {
     }
 
     function ownApprovalContent(publicationId, content) {
-      return request.auth.uid == 'teWRzOUt6V1reZ7dklZcCe9S2D2'
+      return request.auth.uid == 'teWRzOUt6lV1reZ7dklZcCe9S2D2'
         && moderator()
         && getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.ownerUid == request.auth.uid
         && getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId in [request.auth.uid + '_1', request.auth.uid + '_2', request.auth.uid + '_3']
