@@ -250,7 +250,7 @@
     try {
       await FirebaseCloud.marketplace.submitList(user.uid, {
         sourceListId, targetPublicationId: $('publishDialog').dataset.targetPublicationId,
-        titulo: title, descricao: $('publishDescription').value.trim(), autorApelido: alias, perguntas
+        titulo: title, descricao: $('publishDescription').value.trim(), autorApelido: alias, perguntas: questions
       });
       localStorage.setItem(`escondePerguntas:marketAlias:${user.uid}`, alias);
       $('publishDialog').close();
