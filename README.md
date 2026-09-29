@@ -53,7 +53,7 @@ Cada conta verificada pode manter até três envios pendentes. Um slot decidido 
 
 ### App Check e publicação
 
-O site usa App Check com reCAPTCHA Enterprise. Crie uma chave do tipo Web no Google Cloud, limitando-a ao domínio `caleo-hub.github.io`; registre o app em Firebase Console > Segurança > App Check. Copie a chave pública do site para `appCheckSiteKey` em `js/firebase-config.js`. É uma chave pública do reCAPTCHA, não uma credencial administrativa. Primeiro verifique as métricas de solicitações e então ative a exigência para o Firestore. Não inclua credenciais de service account no repositório.
+O SDK do App Check está incluído, mas App Check permanece **desativado e sem chave** nesta versão, por decisão do responsável pelo projeto. Para ativá-lo futuramente, crie uma chave Web no Google Cloud limitada a `caleo-hub.github.io`, registre o app em Firebase Console > Segurança > App Check e preencha `appCheckSiteKey` em `js/firebase-config.js`. A API reCAPTCHA Enterprise pode exigir aceitação de termos e ter custos por volume; revise essas condições no Console antes de habilitá-la. Primeiro confira as métricas em modo de observação e só então ative a exigência para o Firestore. Não inclua credenciais de service account no repositório.
 
 Publique índices e regras antes do site com `npx firebase-tools deploy --only firestore:rules,firestore:indexes --project esconde-perguntas`. Depois publique a branch `main` no GitHub Pages e confirme que o Service Worker atualizou. O catálogo, denúncias, cópia e moderação exigem conexão; as listas pessoais continuam disponíveis offline.
 
