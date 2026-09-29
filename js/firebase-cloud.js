@@ -28,6 +28,7 @@
   const submissions = db.collection('marketplaceSubmissions');
   const reports = db.collection('marketplaceReports');
   const moderators = db.collection('marketplaceModerators');
+  const selfApprovalUid = 'teWRzOUt6V1reZ7dklZcCe9S2D2';
   const blocks = db.collection('marketplaceBlocks');
   const serverTime = () => firebase.firestore.FieldValue.serverTimestamp();
   const asItem = document => ({ id: document.id, ...document.data() });
@@ -81,6 +82,9 @@
       const document = await moderators.doc(uid).get();
       return document.exists && document.data().ativo === true && auth.currentUser?.emailVerified === true;
     },
+    canApproveOwnSubmission(submission) {
+      return auth.currentUser?.uid === selfApprovalUid && submission.ownerUid === selfApprovalUid;
+    },
     async getModerationQueue() {
       const [pending, openReports] = await Promise.all([
         submissions.where('status', '==', 'pending').orderBy('submittedAt').limit(25).get(),
@@ -127,7 +131,8 @@
         const snapshot = await transaction.get(ref);
         if (!snapshot.exists || snapshot.data().status !== 'pending') throw new Error('Este envio já foi analisado.');
         const submission = snapshot.data();
-        if (!uid || uid === submission.ownerUid || !auth.currentUser?.emailVerified) throw new Error('Sua conta não pode aprovar este envio.');
+        const selfApprovalAllowed = uid === selfApprovalUid && submission.ownerUid === selfApprovalUid;
+        if (!uid || (uid === submission.ownerUid && !selfApprovalAllowed) || !auth.currentUser?.emailVerified) throw new Error('Sua conta não pode aprovar este envio.');
         if (decision === 'reject') {
           transaction.update(ref, { status: 'rejected', rejectionReason: reason.slice(0, 300), decisionAt: serverTime(), decisionBy: uid });
           return;
@@ -147,7 +152,8 @@
           titulo: submission.titulo, titleKey: publicPrefix(submission.titulo),
           descricao: submission.descricao, autorApelido: submission.autorApelido,
           quantidade: submission.perguntas.length, status: 'active', acesso: 'free',
-          versao: version, publishedAt: previous?.publishedAt || serverTime(), updatedAt: serverTime()
+          versao: version, publishedAt: previous?.publishedAt || serverTime(), updatedAt: serverTime(),
+          ...(selfApprovalAllowed ? { approvalSubmissionId: id } : {})
         };
         transaction.set(listingRef, metadata);
         transaction.set(listingRef.collection('content').doc('main'), { versao: version, perguntas: submission.perguntas });

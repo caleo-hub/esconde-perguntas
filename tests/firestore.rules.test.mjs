@@ -1,9 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { after, before, test } from 'node:test';
 import { assertFails, assertSucceeds, initializeTestEnvironment } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 
 const projectId = 'demo-esconde-perguntas';
+const selfApproverUid = 'teWRzOUt6V1reZ7dklZcCe9S2D2';
 let env;
 
 function publicMetadata(id, ownerUid = 'owner') {
@@ -35,6 +36,7 @@ before(async () => {
   await env.withSecurityRulesDisabled(async context => {
     const db = context.firestore();
     await setDoc(doc(db, 'marketplaceModerators', 'moderator'), { ativo: true });
+    await setDoc(doc(db, 'marketplaceModerators', selfApproverUid), { ativo: true });
     await setDoc(doc(db, 'marketplaceLists', 'active-list'), publicMetadata('active-list'));
     await setDoc(doc(db, 'marketplaceLists', 'active-list', 'content', 'main'), {
       versao: 1, perguntas: [{ pergunta: 'Pergunta pública?', resposta: 'Resposta pública', ordem: 0 }]
@@ -109,4 +111,31 @@ test('moderador publica para outra pessoa e não pode publicar em nome próprio'
   await assertSucceeds(updateDoc(doc(moderatorDb, 'marketplaceSubmissions/author_1'), {
     status: 'approved', publicationId: 'new-publication', decisionAt: serverTimestamp(), decisionBy: 'moderator'
   }));
+});
+
+test('somente a conta autorizada aprova o próprio envio junto com o conteúdo publicado', async () => {
+  const db = env.authenticatedContext(selfApproverUid, { email_verified: true }).firestore();
+  const submissionRef = doc(db, `marketplaceSubmissions/${selfApproverUid}_1`);
+  const publicationRef = doc(db, 'marketplaceLists/self-approval');
+  const contentRef = doc(db, 'marketplaceLists/self-approval/content/main');
+  const questions = [{ pergunta: 'Pergunta?', resposta: 'Resposta', ordem: 0 }];
+  await env.withSecurityRulesDisabled(async context => {
+    await setDoc(doc(context.firestore(), `marketplaceSubmissions/${selfApproverUid}_1`), {
+      ...submission(selfApproverUid), submittedAt: new Date()
+    });
+  });
+
+  const batch = writeBatch(db);
+  batch.set(publicationRef, {
+    ...publicMetadata('self-approval', selfApproverUid), approvalSubmissionId: `${selfApproverUid}_1`
+  });
+  batch.set(contentRef, { versao: 1, perguntas: questions });
+  batch.update(submissionRef, {
+    status: 'approved', publicationId: 'self-approval', decisionAt: serverTimestamp(),
+    decisionBy: selfApproverUid, rejectionReason: ''
+  });
+  await assertSucceeds(batch.commit());
+
+  const otherModerator = env.authenticatedContext('moderator', { email_verified: true }).firestore();
+  await assertFails(setDoc(doc(otherModerator, 'marketplaceLists/other-self-approval'), publicMetadata('other-self-approval', 'moderator')));
 });

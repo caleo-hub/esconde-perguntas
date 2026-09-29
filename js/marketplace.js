@@ -343,7 +343,7 @@
     });
     const approve = document.createElement('button'); approve.type = 'button'; approve.className = 'primary-button'; approve.textContent = 'Aprovar';
     approve.addEventListener('click', async () => {
-      if (submission.ownerUid === FirebaseCloud.auth.currentUser?.uid) { App.notify('Você não pode aprovar seu próprio envio.'); return; }
+      if (submission.ownerUid === FirebaseCloud.auth.currentUser?.uid && !FirebaseCloud.marketplace.canApproveOwnSubmission(submission)) { App.notify('Você não pode aprovar seu próprio envio.'); return; }
       approve.disabled = true;
       try { await FirebaseCloud.marketplace.decideSubmission(submission.id, 'approve'); showModeration(); }
       catch (error) { App.notify(error.message || 'Não foi possível aprovar.'); approve.disabled = false; }

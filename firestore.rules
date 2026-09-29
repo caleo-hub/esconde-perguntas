@@ -16,6 +16,38 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/marketplaceModerators/$(request.auth.uid)).data.ativo == true;
     }
 
+    function ownApprovalSubmission(data, publicationId) {
+      return request.auth.uid == 'teWRzOUt6V1reZ7dklZcCe9S2D2'
+        && moderator()
+        && data.ownerUid == request.auth.uid
+        && data.approvalSubmissionId in [request.auth.uid + '_1', request.auth.uid + '_2', request.auth.uid + '_3']
+        && get(/databases/$(database)/documents/marketplaceSubmissions/$(data.approvalSubmissionId)).data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/marketplaceSubmissions/$(data.approvalSubmissionId)).data.status == 'pending'
+        && (get(/databases/$(database)/documents/marketplaceSubmissions/$(data.approvalSubmissionId)).data.targetPublicationId == null
+          || get(/databases/$(database)/documents/marketplaceSubmissions/$(data.approvalSubmissionId)).data.targetPublicationId == publicationId)
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(data.approvalSubmissionId)).data.status == 'approved'
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(data.approvalSubmissionId)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(data.approvalSubmissionId)).data.publicationId == publicationId
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(data.approvalSubmissionId)).data.decisionBy == request.auth.uid;
+    }
+
+    function ownApprovalContent(publicationId, content) {
+      return request.auth.uid == 'teWRzOUt6V1reZ7dklZcCe9S2D2'
+        && moderator()
+        && getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId in [request.auth.uid + '_1', request.auth.uid + '_2', request.auth.uid + '_3']
+        && get(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.status == 'pending'
+        && (get(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.targetPublicationId == null
+          || get(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.targetPublicationId == publicationId)
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.status == 'approved'
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.ownerUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.publicationId == publicationId
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.decisionBy == request.auth.uid
+        && getAfter(/databases/$(database)/documents/marketplaceSubmissions/$(getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.approvalSubmissionId)).data.perguntas == content.perguntas
+        && getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.versao == content.versao;
+    }
+
     function notBlocked() {
       return !signedIn()
         || !exists(/databases/$(database)/documents/marketplaceBlocks/$(request.auth.uid))
@@ -122,7 +154,8 @@ service cloud.firestore {
           || (signedIn() && resource.data.ownerUid == request.auth.uid)
           || moderator());
       allow create: if moderator()
-        && request.resource.data.ownerUid != request.auth.uid
+        && (request.resource.data.ownerUid != request.auth.uid
+          || ownApprovalSubmission(request.resource.data, publicationId))
         && request.resource.data.status == 'active'
         && request.resource.data.acesso == 'free';
       allow update: if moderator()
@@ -143,7 +176,8 @@ service cloud.firestore {
         allow list: if moderator();
         allow create, update: if moderator()
           && getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.status == 'active'
-          && getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.ownerUid != request.auth.uid
+          && (getAfter(/databases/$(database)/documents/marketplaceLists/$(publicationId)).data.ownerUid != request.auth.uid
+            || ownApprovalContent(publicationId, request.resource.data))
           && request.resource.data.keys().hasOnly(['versao', 'perguntas'])
           && request.resource.data.versao is int
           && request.resource.data.perguntas is list
