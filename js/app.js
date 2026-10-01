@@ -6,6 +6,7 @@
   const $ = id => document.getElementById(id);
   const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyRevealedIds: new Set(), installPrompt: null, user: null, storageKey: STORAGE_KEY, authMode: 'login', importLegacyOnLogin: false };
   let toastTimer;
+  let authGeneration = 0;
 
   function accountStorageKey() { return state.user ? `${STORAGE_KEY}:${state.user.uid}` : STORAGE_KEY; }
 
@@ -619,7 +620,7 @@
     } catch { return 0; }
   }
 
-  function activateAccount(user) {
+  function activateAccount(user, generation) {
     state.user = user;
     state.storageKey = accountStorageKey();
     const ownSaved = localStorage.getItem(state.storageKey);
@@ -631,15 +632,17 @@
     const localQuestions = [...state.questions];
     const localLists = [...state.lists];
     state.currentListId = null;
-    $('authView').hidden = false;
+    $('bootView').hidden = false;
+    $('authView').hidden = true;
     $('appShell').hidden = true;
-    $('authTitle').textContent = 'Carregando seus estudos';
-    $('authDescription').textContent = 'Estamos buscando suas listas salvas na sua conta.';
-    $('authForm').hidden = true;
-    $('authModeButton').hidden = true;
-    $('resetPasswordButton').hidden = true;
-    const finishLoading = () => { $('authView').hidden = true; $('appShell').hidden = false; };
+    const finishLoading = () => {
+      if (generation !== authGeneration) return;
+      $('bootView').hidden = true;
+      $('authView').hidden = true;
+      $('appShell').hidden = false;
+    };
     FirebaseCloud.watch(user.uid, (remote, initial, error) => {
+      if (generation !== authGeneration) return;
       if (initial) {
         if (error) {
           state.questions = localQuestions;
@@ -785,18 +788,20 @@
     $('authModeButton').addEventListener('click', () => setAuthMode(state.authMode === 'login' ? 'register' : 'login'));
     $('resetPasswordButton').addEventListener('click', resetPassword);
     FirebaseCloud.auth.onAuthStateChanged(user => {
-      if (user) activateAccount(user);
+      const generation = ++authGeneration;
+      if (user) activateAccount(user, generation);
       else {
         FirebaseCloud.stopSync();
         state.user = null;
         state.questions = [];
         state.lists = [{ id: GENERAL_ID, nome: 'Geral' }];
         state.currentListId = null;
+        $('bootView').hidden = true;
         $('appShell').hidden = true;
         $('authView').hidden = false;
         setAuthMode('login');
       }
-    }, error => showAuthError(error));
+    }, error => { $('bootView').hidden = true; $('appShell').hidden = true; $('authView').hidden = false; setAuthMode('login'); showAuthError(error); });
     $('newListButton').addEventListener('click', () => openListForm());
     $('cleanupDuplicatesButton').addEventListener('click', cleanupDuplicates);
     $('listForm').addEventListener('submit', saveListForm);

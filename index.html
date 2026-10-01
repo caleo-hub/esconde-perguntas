@@ -16,10 +16,17 @@
   <script src="./js/firebase-config.js" defer></script>
   <script src="./js/firebase-cloud.js?v=21" defer></script>
   <script src="./js/question-dedup.js?v=1" defer></script>
-  <script src="./js/app.js?v=21" defer></script>
+  <script src="./js/app.js?v=22" defer></script>
 </head>
 <body>
-  <section id="authView" class="auth-screen" aria-labelledby="authTitle">
+  <section id="bootView" class="auth-screen" aria-labelledby="bootTitle" role="status">
+    <div class="auth-card">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">?</span><span>Esconde<br><strong>Perguntas</strong></span></div>
+      <h1 id="bootTitle">Abrindo seus estudos</h1>
+      <p>Verificando sua conta e suas listas salvas.</p>
+    </div>
+  </section>
+  <section id="authView" class="auth-screen" aria-labelledby="authTitle" hidden>
     <div class="auth-card">
       <div class="brand"><span class="brand-mark" aria-hidden="true">?</span><span>Esconde<br><strong>Perguntas</strong></span></div>
       <div class="eyebrow auth-eyebrow">SEUS ESTUDOS, COM VOCÊ</div>
