@@ -4,7 +4,7 @@
   const STORAGE_KEY = 'escondePerguntas';
   const GENERAL_ID = 'geral';
   const $ = id => document.getElementById(id);
-  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyRevealedIds: new Set(), installPrompt: null, user: null, storageKey: STORAGE_KEY, authMode: 'login', importLegacyOnLogin: false, page: 'catalog', pendingAuthAction: null };
+  const state = { questions: [], lists: [{ id: GENERAL_ID, nome: 'Geral' }], currentListId: null, filter: 'all', revealedIds: new Set(), shuffled: false, displayIds: [], studyIds: [], studyRevealedIds: new Set(), installPrompt: null, user: null, storageKey: STORAGE_KEY, authMode: 'login', importLegacyOnLogin: false };
   let toastTimer;
 
   function accountStorageKey() { return state.user ? `${STORAGE_KEY}:${state.user.uid}` : STORAGE_KEY; }
@@ -50,14 +50,14 @@
     }
   }
 
-  function persist(next, nextLists = state.lists, sync = true) {
+  function persist(next, nextLists = state.lists) {
     try {
       const ordered = withQuestionOrder(next);
       localStorage.setItem(accountStorageKey(), JSON.stringify({ version: 2, listas: nextLists, perguntas: ordered }));
       state.questions = ordered;
       state.lists = nextLists;
       render();
-      if (state.user && sync) FirebaseCloud.saveDelta(nextLists, ordered).catch(() => notify('Salvo neste aparelho. A sincronização será tentada quando a conexão voltar.'));
+      if (state.user) FirebaseCloud.saveDelta(nextLists, ordered).catch(() => notify('Salvo neste aparelho. A sincronização será tentada quando a conexão voltar.'));
       return true;
     } catch (error) {
       notify('Não foi possível salvar. Verifique o espaço ou as permissões do navegador.');
@@ -160,7 +160,6 @@
   function openList(id) {
     if (!state.lists.some(list => list.id === id)) return;
     state.currentListId = id;
-    state.page = 'home';
     state.filter = 'all';
     state.shuffled = false;
     state.displayIds = [];
@@ -172,6 +171,9 @@
   }
 
   function renderHome() {
+    const repeated = QuestionDedup.compact(state.questions).removed;
+    $('duplicateNotice').hidden = repeated === 0;
+    $('duplicateNoticeText').textContent = `Encontramos ${repeated} pergunta${repeated === 1 ? '' : 's'} repetida${repeated === 1 ? '' : 's'} com a mesma pergunta e resposta dentro da mesma lista. As marcações de dificuldade serão preservadas.`;
     const cards = state.lists.map(list => {
       const questions = state.questions.filter(item => item.listaId === list.id);
       const button = document.createElement('button');
@@ -201,28 +203,11 @@
 
   function render() {
     if (state.currentListId && !state.lists.some(list => list.id === state.currentListId)) state.currentListId = null;
-    const privatePage = state.page === 'home';
-    $('homeView').hidden = !privatePage || state.currentListId !== null;
-    $('listView').hidden = !privatePage || state.currentListId === null;
-    $('catalogView').hidden = state.page !== 'catalog';
-    $('catalogDetailView').hidden = state.page !== 'catalogDetail';
-    $('myPublicationsView').hidden = state.page !== 'myPublications';
-    $('moderationView').hidden = state.page !== 'moderation';
-    $('mainNavigation').hidden = !['home', 'catalog'].includes(state.page);
-    $('navMyLists').setAttribute('aria-pressed', String(privatePage));
-    $('navExplore').setAttribute('aria-pressed', String(state.page === 'catalog'));
-    $('accountButton').hidden = Boolean(state.user);
-    $('menuButton').hidden = !state.user;
     $('verifyEmailButton').hidden = !state.user || state.user.emailVerified;
-    $('importButton').hidden = !state.user;
-    $('exportButton').hidden = !state.user;
-    $('signOutButton').hidden = !state.user;
-    $('deleteAllButton').hidden = !state.user;
-    $('myPublicationsButton').hidden = !state.user;
-    $('publishListButton').hidden = !state.user;
-    $('addButton').hidden = !state.user || !privatePage || !state.currentListId;
+    $('homeView').hidden = state.currentListId !== null;
+    $('listView').hidden = state.currentListId === null;
     renderHome();
-    if (!privatePage || !state.currentListId) return;
+    if (!state.currentListId) { $('addButton').hidden = true; return; }
     const currentList = state.lists.find(list => list.id === state.currentListId);
     const listQuestions = state.questions.filter(item => item.listaId === state.currentListId);
     const visible = visibleQuestions();
@@ -259,28 +244,6 @@
       $('emptyTitle').textContent = 'Nenhuma pergunta muito difícil ainda';
       $('emptyText').textContent = 'Marque uma pergunta como difícil e toque em ! para revisar aqui.';
     }
-  }
-
-  function showAuthPage(action = null) {
-    state.pendingAuthAction = action;
-    $('appShell').hidden = true;
-    $('authView').hidden = false;
-    setAuthMode('login');
-  }
-
-  function requireAccount(action) {
-    if (state.user) { action?.(); return true; }
-    showAuthPage(action);
-    return false;
-  }
-
-  function showPage(page) {
-    state.page = page;
-    render();
-    window.scrollTo(0, 0);
-    if (page === 'catalog') Marketplace.showCatalog(true);
-    if (page === 'myPublications') Marketplace.showMyPublications();
-    if (page === 'moderation') Marketplace.showModeration();
   }
 
   function createCard(item, index, inStudy = false) {
@@ -383,6 +346,13 @@
     const id = $('questionId').value;
     const now = new Date().toISOString();
     const existing = state.questions.find(item => item.id === id);
+    const listId = existing?.listaId || state.currentListId;
+    const key = QuestionDedup.pairKey({ pergunta, resposta }, listId);
+    if (state.questions.some(item => item.id !== id && QuestionDedup.pairKey(item) === key)) {
+      $('formError').textContent = 'Esta pergunta e resposta já estão nesta lista.';
+      $('formError').hidden = false;
+      return;
+    }
     const updated = existing ? state.questions.map(item => item.id === id ? { ...item, pergunta, resposta, atualizadaEm: now } : item) : [{ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, muitoDificil: false, criadaEm: now, atualizadaEm: now }, ...state.questions];
     if (persist(updated)) { $('formDialog').close(); notify(existing ? 'Pergunta atualizada.' : 'Pergunta adicionada.'); }
   }
@@ -441,7 +411,13 @@
     event.preventDefault();
     const id = $('moveQuestionId').value;
     const target = $('moveTarget').value;
-    if (!state.lists.some(list => list.id === target) || !state.questions.some(item => item.id === id)) return;
+    const source = state.questions.find(item => item.id === id);
+    if (!state.lists.some(list => list.id === target) || !source) return;
+    const key = QuestionDedup.pairKey(source, target);
+    if (state.questions.some(item => item.id !== id && QuestionDedup.pairKey(item) === key)) {
+      notify('Esta pergunta e resposta já estão na lista de destino.');
+      return;
+    }
     if (persist(state.questions.map(item => item.id === id ? { ...item, listaId: target, atualizadaEm: new Date().toISOString() } : item))) {
       $('moveDialog').close();
       notify('Pergunta movida.');
@@ -496,24 +472,26 @@
 
   function updateBatchPreview() {
     const { pairs, errors } = parseBatch($('batchField').value);
-    $('batchPreview').textContent = `${pairs.length} par${pairs.length === 1 ? '' : 'es'} encontrado${pairs.length === 1 ? '' : 's'}${errors ? ` · ${errors} incompleto${errors === 1 ? '' : 's'}` : ''}.`;
-    $('batchSave').disabled = !pairs.length || !!errors || pairs.length > 500;
+    const { unique, skipped } = QuestionDedup.filterIncoming(pairs, state.questions, state.currentListId);
+    $('batchPreview').textContent = `${unique.length} pergunta${unique.length === 1 ? '' : 's'} nova${unique.length === 1 ? '' : 's'}${skipped ? ` · ${skipped} repetida${skipped === 1 ? '' : 's'} ignorada${skipped === 1 ? '' : 's'}` : ''}${errors ? ` · ${errors} incompleto${errors === 1 ? '' : 's'}` : ''}.`;
+    $('batchSave').disabled = !unique.length || !!errors || pairs.length > 500;
     $('batchError').hidden = true;
   }
 
   function saveBatch(event) {
     event.preventDefault();
     const { pairs, errors } = parseBatch($('batchField').value);
-    if (!pairs.length || errors || pairs.length > 500) {
-      $('batchError').textContent = pairs.length > 500 ? 'Importe até 500 perguntas por vez.' : 'Confira os pares incompletos antes de adicionar.';
+    const { unique, skipped } = QuestionDedup.filterIncoming(pairs, state.questions, state.currentListId);
+    if (!unique.length || errors || pairs.length > 500) {
+      $('batchError').textContent = pairs.length > 500 ? 'Importe até 500 perguntas por vez.' : errors ? 'Confira os pares incompletos antes de adicionar.' : 'Todas as perguntas já estão nesta lista.';
       $('batchError').hidden = false;
       return;
     }
     const now = new Date().toISOString();
-    const incoming = pairs.map(({ pergunta, resposta }) => ({ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, muitoDificil: false, criadaEm: now, atualizadaEm: now }));
+    const incoming = unique.map(({ pergunta, resposta }) => ({ id: crypto.randomUUID(), listaId: state.currentListId, pergunta, resposta, dificil: false, muitoDificil: false, criadaEm: now, atualizadaEm: now }));
     if (persist([...incoming, ...state.questions])) {
       $('batchDialog').close();
-      notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} adicionada${incoming.length === 1 ? '' : 's'}.`);
+      notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} adicionada${incoming.length === 1 ? '' : 's'}${skipped ? ` · ${skipped} repetida${skipped === 1 ? '' : 's'} ignorada${skipped === 1 ? '' : 's'}` : ''}.`);
     }
   }
 
@@ -551,17 +529,26 @@
     $('studyList').scrollTop = 0;
   }
 
-  function exportBackup() {
+  function exportBackup(suffix = '') {
     const data = { version: 2, exportadoEm: new Date().toISOString(), listas: state.lists, perguntas: state.questions };
     const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = `esconde-perguntas-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `esconde-perguntas-${new Date().toISOString().slice(0, 10)}${suffix}.json`;
     document.body.append(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     notify('Backup exportado.');
+  }
+
+  async function cleanupDuplicates() {
+    const { questions, removed } = QuestionDedup.compact(state.questions);
+    if (!removed) { notify('Não há perguntas repetidas para limpar.'); return; }
+    const agreed = await confirmAction('Limpar perguntas repetidas?', `${removed} cópia${removed === 1 ? '' : 's'} idêntica${removed === 1 ? '' : 's'} será${removed === 1 ? '' : 'ão'} removida${removed === 1 ? '' : 's'}. O app baixará primeiro um backup completo. Perguntas iguais em listas diferentes permanecerão.`, 'Baixar e limpar');
+    if (!agreed) return;
+    exportBackup('-antes-da-limpeza');
+    if (persist(questions)) notify(`${removed} repetida${removed === 1 ? '' : 's'} removida${removed === 1 ? '' : 's'}. Marcações preservadas.`);
   }
 
   async function importBackup(file) {
@@ -602,7 +589,8 @@
       });
       const updatedCount = incoming.filter(item => existingIds.has(item.id)).length;
       const remaining = state.questions.filter(item => !importedIds.has(item.id));
-      if (persist([...incoming, ...remaining], nextLists)) notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} organizada${incoming.length === 1 ? '' : 's'} conforme o backup${updatedCount ? ` · ${updatedCount} atualizada${updatedCount === 1 ? '' : 's'}` : ''}.`);
+      const compacted = QuestionDedup.compact([...incoming, ...remaining]);
+      if (persist(compacted.questions, nextLists)) notify(`${incoming.length} pergunta${incoming.length === 1 ? '' : 's'} processada${incoming.length === 1 ? '' : 's'} conforme o backup${updatedCount ? ` · ${updatedCount} atualizada${updatedCount === 1 ? '' : 's'}` : ''}${compacted.removed ? ` · ${compacted.removed} repetida${compacted.removed === 1 ? '' : 's'} ignorada${compacted.removed === 1 ? '' : 's'}` : ''}.`);
     } catch (error) {
       notify('Arquivo inválido. Selecione um backup JSON do aplicativo.');
     } finally {
@@ -643,7 +631,6 @@
     const localQuestions = [...state.questions];
     const localLists = [...state.lists];
     state.currentListId = null;
-    state.page = 'home';
     $('authView').hidden = false;
     $('appShell').hidden = true;
     $('authTitle').textContent = 'Carregando seus estudos';
@@ -651,18 +638,7 @@
     $('authForm').hidden = true;
     $('authModeButton').hidden = true;
     $('resetPasswordButton').hidden = true;
-    const finishLoading = () => {
-      $('authView').hidden = true;
-      $('appShell').hidden = false;
-      Marketplace.updateAccountUI();
-      const pending = state.pendingAuthAction;
-      state.pendingAuthAction = null;
-      if (pending) pending();
-      else {
-        const publicationId = new URLSearchParams(location.search).get('catalogo');
-        if (publicationId) Marketplace.openPublication(publicationId);
-      }
-    };
+    const finishLoading = () => { $('authView').hidden = true; $('appShell').hidden = false; };
     FirebaseCloud.watch(user.uid, (remote, initial, error) => {
       if (initial) {
         if (error) {
@@ -808,8 +784,6 @@
     $('authForm').addEventListener('submit', submitAuth);
     $('authModeButton').addEventListener('click', () => setAuthMode(state.authMode === 'login' ? 'register' : 'login'));
     $('resetPasswordButton').addEventListener('click', resetPassword);
-    $('accountButton').addEventListener('click', () => showAuthPage());
-    $('guestBrowseButton').addEventListener('click', () => { state.pendingAuthAction = null; $('authView').hidden = true; $('appShell').hidden = false; showPage('catalog'); });
     FirebaseCloud.auth.onAuthStateChanged(user => {
       if (user) activateAccount(user);
       else {
@@ -818,34 +792,13 @@
         state.questions = [];
         state.lists = [{ id: GENERAL_ID, nome: 'Geral' }];
         state.currentListId = null;
-        state.page = 'catalog';
-        $('appShell').hidden = false;
-        $('authView').hidden = true;
-        Marketplace.updateAccountUI();
-        render();
-        const publicationId = new URLSearchParams(location.search).get('catalogo');
-        if (publicationId) Marketplace.openPublication(publicationId);
-        else Marketplace.showCatalog(true);
+        $('appShell').hidden = true;
+        $('authView').hidden = false;
+        setAuthMode('login');
       }
     }, error => showAuthError(error));
-    $('navMyLists').addEventListener('click', () => requireAccount(() => showPage('home')));
-    $('navExplore').addEventListener('click', () => showPage('catalog'));
-    $('catalogSearch').addEventListener('input', () => Marketplace.searchChanged());
-    $('catalogMore').addEventListener('click', () => Marketplace.showCatalog(false));
-    $('catalogBack').addEventListener('click', () => { history.replaceState(null, '', location.pathname); showPage('catalog'); });
-    $('copyPublicationButton').addEventListener('click', () => requireAccount(() => Marketplace.copyPublication()));
-    $('sharePublicationButton').addEventListener('click', () => Marketplace.sharePublication());
-    $('reportPublicationButton').addEventListener('click', () => requireAccount(() => Marketplace.openReport()));
-    $('publishListButton').addEventListener('click', () => requireAccount(() => Marketplace.openPublishForm()));
-    $('publishForm').addEventListener('submit', event => Marketplace.submitPublication(event));
-    $('reportForm').addEventListener('submit', event => Marketplace.submitReport(event));
-    $('publishVerifyButton').addEventListener('click', () => Marketplace.sendVerification());
-    $('reportVerifyButton').addEventListener('click', () => Marketplace.sendVerification());
-    $('myPublicationsButton').addEventListener('click', () => { closeMenu(); showPage('myPublications'); });
-    $('moderationButton').addEventListener('click', () => { closeMenu(); showPage('moderation'); });
-    $('myPublicationsBack').addEventListener('click', () => showPage('home'));
-    $('moderationBack').addEventListener('click', () => showPage('home'));
     $('newListButton').addEventListener('click', () => openListForm());
+    $('cleanupDuplicatesButton').addEventListener('click', cleanupDuplicates);
     $('listForm').addEventListener('submit', saveListForm);
     $('backButton').addEventListener('click', () => { state.currentListId = null; render(); window.scrollTo(0, 0); });
     $('listOptionsButton').addEventListener('click', () => { $('listOptions').hidden = !$('listOptions').hidden; $('listOptionsButton').setAttribute('aria-expanded', String(!$('listOptions').hidden)); });
@@ -892,19 +845,6 @@
     window.addEventListener('appinstalled', () => { state.installPrompt = null; $('installButton').hidden = true; });
     if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   }
-
-  window.App = {
-    getState: () => state,
-    notify,
-    render,
-    persist,
-    showPage,
-    requireAccount,
-    showAuthPage,
-    openList,
-    refreshAccount: async () => { await FirebaseCloud.auth.currentUser?.reload(); state.user = FirebaseCloud.auth.currentUser; render(); },
-    sendVerificationEmail
-  };
 
   setup();
 })();

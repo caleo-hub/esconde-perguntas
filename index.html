@@ -9,18 +9,17 @@
   <link rel="icon" href="./icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./css/style.css?v=14">
+  <link rel="stylesheet" href="./css/style.css?v=21">
   <script src="./vendor/firebase/firebase-app-compat.js" defer></script>
   <script src="./vendor/firebase/firebase-auth-compat.js" defer></script>
   <script src="./vendor/firebase/firebase-firestore-compat.js" defer></script>
-  <script src="./vendor/firebase/firebase-app-check-compat.js" defer></script>
   <script src="./js/firebase-config.js" defer></script>
-  <script src="./js/firebase-cloud.js?v=18" defer></script>
-  <script src="./js/marketplace.js?v=5" defer></script>
-  <script src="./js/app.js?v=17" defer></script>
+  <script src="./js/firebase-cloud.js?v=21" defer></script>
+  <script src="./js/question-dedup.js?v=1" defer></script>
+  <script src="./js/app.js?v=21" defer></script>
 </head>
 <body>
-  <section id="authView" class="auth-screen" aria-labelledby="authTitle" hidden>
+  <section id="authView" class="auth-screen" aria-labelledby="authTitle">
     <div class="auth-card">
       <div class="brand"><span class="brand-mark" aria-hidden="true">?</span><span>Esconde<br><strong>Perguntas</strong></span></div>
       <div class="eyebrow auth-eyebrow">SEUS ESTUDOS, COM VOCÊ</div>
@@ -38,35 +37,32 @@
       </form>
       <button id="authModeButton" class="auth-link" type="button">Criar uma conta</button>
       <button id="resetPasswordButton" class="auth-link" type="button">Esqueci minha senha</button>
-      <button id="guestBrowseButton" class="auth-link" type="button">← Voltar a explorar listas</button>
     </div>
   </section>
-  <div id="appShell" class="app-shell">
+  <div id="appShell" class="app-shell" hidden>
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">?</span><span>Esconde<br><strong>Perguntas</strong></span></div>
-      <div class="topbar-actions"><button id="accountButton" class="secondary-button account-button" type="button">Entrar</button><button id="menuButton" class="icon-button" type="button" aria-label="Abrir menu" aria-haspopup="menu" aria-expanded="false" hidden>⋮</button></div>
+      <button id="menuButton" class="icon-button" type="button" aria-label="Abrir menu" aria-haspopup="menu" aria-expanded="false">⋮</button>
       <div id="menu" class="menu" role="menu" hidden>
         <button type="button" role="menuitem" id="importButton">Importar perguntas</button>
         <button type="button" role="menuitem" id="exportButton">Exportar backup</button>
         <button type="button" role="menuitem" id="installButton" hidden>Instalar aplicativo</button>
         <button type="button" role="menuitem" id="aboutButton">Sobre o aplicativo</button>
         <button type="button" role="menuitem" id="verifyEmailButton" hidden>Reenviar confirmação de e-mail</button>
-        <button type="button" role="menuitem" id="myPublicationsButton">Minhas publicações</button>
-        <button type="button" role="menuitem" id="moderationButton" hidden>Moderação</button>
         <button type="button" role="menuitem" id="signOutButton">Sair da conta</button>
         <button type="button" role="menuitem" id="deleteAllButton" class="danger-text">Apagar todos os dados</button>
       </div>
     </header>
 
     <main>
-      <nav id="mainNavigation" class="main-navigation" aria-label="Navegação principal">
-        <button id="navMyLists" type="button" aria-pressed="false">Minhas listas</button>
-        <button id="navExplore" type="button" aria-pressed="true">Explorar listas</button>
-      </nav>
       <section id="homeView" class="home-screen" aria-labelledby="homeTitle">
         <div class="eyebrow"><span class="eyebrow-dot"></span> SEU ESPAÇO DE REVISÃO</div>
         <h1 id="homeTitle">Suas <em>listas.</em></h1>
         <p class="home-intro">Separe os assuntos e volte ao que precisa revisar.</p>
+        <aside id="duplicateNotice" class="duplicate-notice" hidden>
+          <p id="duplicateNoticeText"></p>
+          <button id="cleanupDuplicatesButton" class="secondary-button" type="button">Baixar backup e limpar repetidas</button>
+        </aside>
         <button id="newListButton" class="primary-button new-list-button" type="button">＋ Nova lista</button>
         <div id="listGrid" class="list-grid"></div>
       </section>
@@ -80,7 +76,6 @@
         <div class="hero-actions">
           <button id="studyButton" class="primary-button study-cta" type="button"><span id="heroActionIcon" aria-hidden="true">＋</span> <span id="heroActionText">Criar pergunta</span> <span aria-hidden="true">↗</span></button>
           <button id="batchButton" class="batch-link" type="button"><span aria-hidden="true">▦</span> Adicionar em lote</button>
-          <button id="publishListButton" class="secondary-button publish-button" type="button">Publicar no catálogo</button>
         </div>
       </section>
 
@@ -93,36 +88,6 @@
         <div id="emptyState" class="empty-state" hidden><div class="empty-icon" aria-hidden="true">✦</div><h3 id="emptyTitle">Sua coleção começa aqui</h3><p id="emptyText">Use os botões acima para criar uma pergunta ou colar uma lista inteira.</p></div>
       </section>
       </div>
-      <section id="catalogView" class="catalog-view" aria-labelledby="catalogTitle" hidden>
-        <div class="eyebrow"><span class="eyebrow-dot"></span> COMPARTILHADAS PELA COMUNIDADE</div>
-        <h1 id="catalogTitle">Explore <em>listas.</em></h1>
-        <p class="home-intro">Encontre perguntas para estudar e salve uma cópia na sua conta.</p>
-        <label class="search-box"><span aria-hidden="true">⌕</span><span class="sr-only">Buscar pelo início do título</span><input id="catalogSearch" type="search" placeholder="Buscar pelo início do título..." autocomplete="off"></label>
-        <div id="catalogStatus" class="catalog-status" role="status" aria-live="polite"></div>
-        <div id="catalogCards" class="catalog-cards"></div>
-        <div id="catalogEmpty" class="empty-state" hidden><div class="empty-icon" aria-hidden="true">✦</div><h3 id="catalogEmptyTitle">Ainda não há listas publicadas</h3><p id="catalogEmptyText">Volte mais tarde para explorar as listas da comunidade.</p></div>
-        <button id="catalogMore" class="secondary-button catalog-more" type="button" hidden>Carregar mais</button>
-      </section>
-      <section id="catalogDetailView" class="catalog-detail-view" hidden>
-        <button id="catalogBack" class="back-button" type="button">← Voltar ao catálogo</button>
-        <header class="catalog-detail-heading">
-          <div class="eyebrow">LISTA DA COMUNIDADE</div><h1 id="catalogDetailTitle"></h1><p id="catalogDetailDescription"></p>
-          <div id="catalogDetailMeta" class="catalog-meta"></div>
-          <div class="catalog-detail-actions"><button id="copyPublicationButton" class="primary-button" type="button">Copiar para minhas listas</button><button id="sharePublicationButton" class="secondary-button" type="button">Compartilhar link</button><button id="reportPublicationButton" class="text-button" type="button">Denunciar</button></div>
-          <p class="catalog-note">Conteúdo enviado pela comunidade. Confira as respostas antes de estudar.</p>
-        </header>
-        <div id="catalogQuestionList" class="question-list"></div>
-      </section>
-      <section id="myPublicationsView" class="catalog-view" hidden>
-        <button id="myPublicationsBack" class="back-button" type="button">← Voltar</button><div class="eyebrow">SUAS PUBLICAÇÕES</div><h1>Minhas <em>publicações.</em></h1>
-        <div id="myPublicationsList" class="catalog-cards"></div>
-        <div id="myPublicationsEmpty" class="empty-state" hidden><h3>Você ainda não publicou listas</h3><p>Abra uma das suas listas e toque em “Publicar no catálogo”.</p></div>
-      </section>
-      <section id="moderationView" class="catalog-view" hidden>
-        <button id="moderationBack" class="back-button" type="button">← Voltar</button><div class="eyebrow">FERRAMENTAS DA EQUIPE</div><h1>Moderação.</h1>
-        <h2>Envios pendentes</h2><div id="moderationQueue" class="catalog-cards"></div>
-        <h2>Denúncias abertas</h2><div id="moderationReports" class="catalog-cards"></div>
-      </section>
     </main>
     <button id="addButton" class="fab" type="button" aria-label="Adicionar pergunta"><span aria-hidden="true">＋</span><span>Nova pergunta</span></button>
   </div>
@@ -135,32 +100,6 @@
       <label for="answerField">Resposta</label><textarea id="answerField" rows="7" maxlength="10000" placeholder="Escreva a resposta aqui..." required></textarea>
       <p id="formError" class="form-error" role="alert" hidden></p>
       <button class="primary-button save-button" type="submit">Salvar pergunta</button>
-    </form>
-  </dialog>
-
-  <dialog id="publishDialog" class="sheet-dialog">
-    <form id="publishForm" class="sheet" novalidate>
-      <div class="dialog-head"><div><div class="eyebrow">COMPARTILHAR ESTUDOS</div><h2>Publicar no catálogo</h2></div><button class="icon-button close-button" type="button" data-close="publishDialog" aria-label="Fechar">×</button></div>
-      <p id="publishListSummary" class="batch-help"></p>
-      <label for="publishTitle">Título da lista</label><input id="publishTitle" class="text-field" type="text" maxlength="60" required>
-      <label for="publishDescription">Descrição</label><textarea id="publishDescription" rows="3" maxlength="280" placeholder="Explique brevemente o assunto desta lista"></textarea>
-      <label for="publishAlias">Como seu nome aparecerá</label><input id="publishAlias" class="text-field" type="text" maxlength="40" placeholder="Apelido público" required>
-      <div id="publishPreview" class="publish-preview"></div>
-      <label class="consent-label"><input id="publishConsent" type="checkbox"><span>Confirmo que posso compartilhar este conteúdo. As perguntas e respostas ficarão públicas e poderão ser copiadas para estudo pessoal.</span></label>
-      <p id="publishError" class="form-error" role="alert" hidden></p>
-      <button id="publishVerifyButton" class="auth-link" type="button" hidden>Enviar link para confirmar e-mail</button>
-      <button id="publishSubmit" class="primary-button save-button" type="submit">Enviar para aprovação</button>
-    </form>
-  </dialog>
-
-  <dialog id="reportDialog" class="sheet-dialog">
-    <form id="reportForm" class="sheet" novalidate>
-      <div class="dialog-head"><div><div class="eyebrow">AJUDE A MANTER O CATÁLOGO</div><h2>Denunciar lista</h2></div><button class="icon-button close-button" type="button" data-close="reportDialog" aria-label="Fechar">×</button></div>
-      <label for="reportReason">Motivo</label><select id="reportReason" class="text-field"><option value="inaccurate">Resposta incorreta</option><option value="copyright">Conteúdo publicado sem autorização</option><option value="inappropriate">Conteúdo inadequado</option><option value="other">Outro</option></select>
-      <label for="reportNote">Detalhes (opcional)</label><textarea id="reportNote" rows="4" maxlength="300" placeholder="Conte à equipe o que devemos verificar"></textarea>
-      <p id="reportError" class="form-error" role="alert" hidden></p>
-      <button id="reportVerifyButton" class="auth-link" type="button" hidden>Enviar link para confirmar e-mail</button>
-      <button class="primary-button save-button" type="submit">Enviar denúncia</button>
     </form>
   </dialog>
 
