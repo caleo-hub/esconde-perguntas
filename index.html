@@ -9,14 +9,14 @@
   <link rel="icon" href="./icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <link rel="manifest" href="./manifest.json">
-  <link rel="stylesheet" href="./css/style.css?v=21">
+  <link rel="stylesheet" href="./css/style.css?v=23">
   <script src="./vendor/firebase/firebase-app-compat.js" defer></script>
   <script src="./vendor/firebase/firebase-auth-compat.js" defer></script>
   <script src="./vendor/firebase/firebase-firestore-compat.js" defer></script>
   <script src="./js/firebase-config.js" defer></script>
   <script src="./js/firebase-cloud.js?v=21" defer></script>
   <script src="./js/question-dedup.js?v=1" defer></script>
-  <script src="./js/app.js?v=22" defer></script>
+  <script src="./js/app.js?v=23" defer></script>
 </head>
 <body>
   <section id="bootView" class="auth-screen" aria-labelledby="bootTitle" role="status">
@@ -66,10 +66,6 @@
         <div class="eyebrow"><span class="eyebrow-dot"></span> SEU ESPAÇO DE REVISÃO</div>
         <h1 id="homeTitle">Suas <em>listas.</em></h1>
         <p class="home-intro">Separe os assuntos e volte ao que precisa revisar.</p>
-        <aside id="duplicateNotice" class="duplicate-notice" hidden>
-          <p id="duplicateNoticeText"></p>
-          <button id="cleanupDuplicatesButton" class="secondary-button" type="button">Baixar backup e limpar repetidas</button>
-        </aside>
         <button id="newListButton" class="primary-button new-list-button" type="button">＋ Nova lista</button>
         <div id="listGrid" class="list-grid"></div>
       </section>
@@ -91,6 +87,7 @@
         <div class="collection-filters" role="group" aria-label="Filtrar perguntas"><button id="filterAll" type="button" aria-pressed="true">Todas <span id="allCount">0</span></button><button id="filterDifficult" type="button" aria-pressed="false">★ Difíceis <span id="difficultCount">0</span></button><button id="filterVery" type="button" aria-pressed="false">! Muito difíceis <span id="veryCount">0</span></button></div>
         <label class="search-box"><span aria-hidden="true">⌕</span><span class="sr-only">Buscar perguntas</span><input id="searchInput" type="search" placeholder="Buscar perguntas..." autocomplete="off"></label>
         <div class="collection-tools"><button id="shuffleButton" class="text-button" type="button" aria-pressed="false"><span aria-hidden="true">⇄</span> Embaralhar</button><button id="revealAllButton" class="text-button" type="button">Mostrar todas</button></div>
+        <button id="cleanupListDuplicatesButton" class="secondary-button cleanup-list-button" type="button" hidden>Remover perguntas duplicadas</button>
         <div id="questionList" class="question-list"></div>
         <div id="emptyState" class="empty-state" hidden><div class="empty-icon" aria-hidden="true">✦</div><h3 id="emptyTitle">Sua coleção começa aqui</h3><p id="emptyText">Use os botões acima para criar uma pergunta ou colar uma lista inteira.</p></div>
       </section>

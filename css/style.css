@@ -63,9 +63,6 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .home-screen h1 { margin: 15px 0 8px; font-size: clamp(42px, 11vw, 62px); line-height: 1.05; letter-spacing: -.06em; }
 .home-screen h1 em { color: var(--accent); font-style: normal; }
 .home-intro { margin: 0 0 24px; color: var(--muted); line-height: 1.55; }
-.duplicate-notice { display: grid; gap: 12px; margin: 0 0 24px; padding: 16px; border: 1px solid var(--accent-line); border-radius: 15px; background: var(--accent-soft); }
-.duplicate-notice p { margin: 0; line-height: 1.5; }
-.duplicate-notice button { width: 100%; }
 .new-list-button { width: 100%; min-height: 54px; margin-bottom: 25px; font-size: 16px; }
 .list-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .list-card { position: relative; display: grid; grid-template-columns: 45px 1fr 24px; grid-template-rows: auto auto; column-gap: 12px; align-items: center; width: 100%; min-height: 100px; padding: 17px; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); color: var(--text); text-align: left; }
@@ -116,6 +113,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px
 .collection-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: -2px 0 15px; }
 .collection-tools button { min-height: 46px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text); font-size: 14px; font-weight: 700; }
 .collection-tools button:hover { border-color: var(--accent-line); background: var(--accent-soft); }
+.cleanup-list-button { width: 100%; margin: 0 0 15px; }
 .question-list { display: grid; grid-template-columns: 1fr; gap: 12px; }
 #questionList, #studyList { grid-template-columns: minmax(0, 1fr); }
 .collection-filters { display: flex; gap: 8px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; }

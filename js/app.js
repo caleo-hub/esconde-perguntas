@@ -172,9 +172,6 @@
   }
 
   function renderHome() {
-    const repeated = QuestionDedup.compact(state.questions).removed;
-    $('duplicateNotice').hidden = repeated === 0;
-    $('duplicateNoticeText').textContent = `Encontramos ${repeated} pergunta${repeated === 1 ? '' : 's'} repetida${repeated === 1 ? '' : 's'} com a mesma pergunta e resposta dentro da mesma lista. As marcações de dificuldade serão preservadas.`;
     const cards = state.lists.map(list => {
       const questions = state.questions.filter(item => item.listaId === list.id);
       const button = document.createElement('button');
@@ -211,6 +208,10 @@
     if (!state.currentListId) { $('addButton').hidden = true; return; }
     const currentList = state.lists.find(list => list.id === state.currentListId);
     const listQuestions = state.questions.filter(item => item.listaId === state.currentListId);
+    const duplicateCount = QuestionDedup.compact(listQuestions).removed;
+    const cleanupButton = $('cleanupListDuplicatesButton');
+    cleanupButton.hidden = duplicateCount === 0;
+    cleanupButton.textContent = `Remover ${duplicateCount} pergunta${duplicateCount === 1 ? '' : 's'} duplicada${duplicateCount === 1 ? '' : 's'}`;
     const visible = visibleQuestions();
     const difficultCount = listQuestions.filter(item => item.dificil).length;
     const veryCount = listQuestions.filter(item => item.muitoDificil).length;
@@ -543,13 +544,20 @@
     notify('Backup exportado.');
   }
 
-  async function cleanupDuplicates() {
-    const { questions, removed } = QuestionDedup.compact(state.questions);
+  async function cleanupListDuplicates() {
+    const listId = state.currentListId;
+    if (!listId) return;
+    const listName = state.lists.find(list => list.id === listId)?.nome || 'esta lista';
+    const currentQuestions = state.questions.filter(item => item.listaId === listId);
+    const { removed } = QuestionDedup.compact(currentQuestions);
     if (!removed) { notify('Não há perguntas repetidas para limpar.'); return; }
-    const agreed = await confirmAction('Limpar perguntas repetidas?', `${removed} cópia${removed === 1 ? '' : 's'} idêntica${removed === 1 ? '' : 's'} será${removed === 1 ? '' : 'ão'} removida${removed === 1 ? '' : 's'}. O app baixará primeiro um backup completo. Perguntas iguais em listas diferentes permanecerão.`, 'Baixar e limpar');
+    const agreed = await confirmAction('Remover perguntas duplicadas?', `${removed} cópia${removed === 1 ? '' : 's'} com a mesma pergunta e resposta será${removed === 1 ? '' : 'ão'} removida${removed === 1 ? '' : 's'} de “${listName}”. A marcação de dificuldade mais alta será preservada.`, 'Remover duplicadas');
     if (!agreed) return;
-    exportBackup('-antes-da-limpeza');
-    if (persist(questions)) notify(`${removed} repetida${removed === 1 ? '' : 's'} removida${removed === 1 ? '' : 's'}. Marcações preservadas.`);
+    const result = QuestionDedup.compact(state.questions.filter(item => item.listaId === listId));
+    if (!result.removed) { notify('Não há perguntas repetidas para limpar.'); return; }
+    const kept = new Map(result.questions.map(item => [item.id, item]));
+    const next = state.questions.filter(item => item.listaId !== listId || kept.has(item.id)).map(item => item.listaId === listId ? kept.get(item.id) : item);
+    if (persist(next)) notify(`${result.removed} repetida${result.removed === 1 ? '' : 's'} removida${result.removed === 1 ? '' : 's'} de “${listName}”.`);
   }
 
   async function importBackup(file) {
@@ -803,7 +811,7 @@
       }
     }, error => { $('bootView').hidden = true; $('appShell').hidden = true; $('authView').hidden = false; setAuthMode('login'); showAuthError(error); });
     $('newListButton').addEventListener('click', () => openListForm());
-    $('cleanupDuplicatesButton').addEventListener('click', cleanupDuplicates);
+    $('cleanupListDuplicatesButton').addEventListener('click', cleanupListDuplicates);
     $('listForm').addEventListener('submit', saveListForm);
     $('backButton').addEventListener('click', () => { state.currentListId = null; render(); window.scrollTo(0, 0); });
     $('listOptionsButton').addEventListener('click', () => { $('listOptions').hidden = !$('listOptions').hidden; $('listOptionsButton').setAttribute('aria-expanded', String(!$('listOptions').hidden)); });

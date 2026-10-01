@@ -29,7 +29,7 @@ O campo opcional `muitoDificil` é salvo junto da pergunta e sempre implica `dif
 
 No cadastro em lote, cole uma lista como `1. Pergunta?` seguida da resposta na próxima linha. Separe os pares com uma linha vazia. O formulário também aceita `Pergunta | Resposta` e duas colunas copiadas de uma planilha. O botão “Copiar prompt para o ChatGPT” oferece um texto para formatar anotações antes de colá-las no aplicativo; nenhuma chamada à API é necessária.
 
-Se houver pares repetidos já salvos, a tela inicial mostra a quantidade e o botão **Baixar backup e limpar repetidas**. A limpeza atua em cada lista separadamente, mantém a primeira posição e o ID da pergunta, e preserva o nível mais alto de dificuldade encontrado entre as cópias. O backup completo é baixado antes da alteração, que depois é sincronizada na conta.
+Ao abrir uma lista, o botão **Remover perguntas duplicadas** mostra quantas cópias têm a mesma pergunta e resposta naquela lista. A limpeza afeta somente a lista aberta, mantém a primeira posição e o ID da pergunta, e preserva o nível mais alto de dificuldade encontrado entre as cópias. A alteração é sincronizada na conta, sem baixar backup automaticamente.
 
 ## Publicação
 
